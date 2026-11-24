@@ -58,7 +58,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.95 }}
               transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-              className="pointer-events-auto flex items-center gap-3 px-4 py-2.5 rounded-card bg-[#1C1C1E] text-[#F5F5F7] shadow-float border border-[var(--color-separator)] text-ui-sm font-medium"
+              className="holo pointer-events-auto flex items-center gap-3 px-4 py-2.5 bg-[var(--surface-hi)] text-[var(--text)] border border-[var(--cyan)] shadow-[0_0_16px_rgba(92,203,245,0.25)] text-xs font-mono uppercase tracking-wider"
             >
               <span>{currentToast.message}</span>
               {currentToast.options?.action && (
@@ -67,7 +67,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                     currentToast.options?.action?.onClick()
                     setCurrentToast(null)
                   }}
-                  className="text-[var(--color-accent)] hover:opacity-80 active:opacity-60 transition-opacity font-semibold ml-1"
+                  className="text-[var(--gold)] hover:underline active:opacity-60 transition-opacity font-semibold ml-1 cursor-pointer"
                 >
                   {currentToast.options.action.label}
                 </button>

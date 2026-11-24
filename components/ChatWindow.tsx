@@ -18,6 +18,7 @@ import { SetupScreen } from './SetupScreen'
 import { SettingsSheet } from './SettingsSheet'
 import { CommandPalette } from './CommandPalette'
 import type { ConfigStatus } from '@/lib/env'
+import type { CoreState } from './JarvisCore'
 
 export default function ChatWindow() {
   const { toast } = useToast()
@@ -103,8 +104,8 @@ export default function ChatWindow() {
     retry,
   } = useChat({
     currentConversation,
-    onUpdateConversation: updateConversation,
     preferences,
+    onUpdateConversation: updateConversation,
     onAutoTitle: handleAutoTitle,
   })
 
@@ -114,9 +115,65 @@ export default function ChatWindow() {
     isSpeaking,
     isSupported: voiceSupported,
     startListening,
-    stopSpeaking,
     speak,
+    stopSpeaking,
   } = useVoice()
+
+  // Core State & Streaming Token Rate Smoothing
+  const [streamLevel, setStreamLevel] = useState(0)
+  const lastTokenTimeRef = useRef<number>(Date.now())
+  const lastCharCountRef = useRef<number>(0)
+  const smoothedLevelRef = useRef<number>(0)
+
+  useEffect(() => {
+    if (!isStreaming) {
+      lastCharCountRef.current = 0
+      smoothedLevelRef.current = 0
+      setStreamLevel(0)
+      return
+    }
+
+    const interval = setInterval(() => {
+      const now = Date.now()
+      const dt = Math.max(0.05, (now - lastTokenTimeRef.current) / 1000)
+      const currentChars = streamingContent.length
+      const deltaChars = Math.max(0, currentChars - lastCharCountRef.current)
+
+      lastCharCountRef.current = currentChars
+      lastTokenTimeRef.current = now
+
+      // Approx 4 chars per token
+      const tokensPerSecond = (deltaChars / 4) / dt
+      const targetLevel = Math.min(1, Math.max(0, tokensPerSecond / 40))
+
+      smoothedLevelRef.current += (targetLevel - smoothedLevelRef.current) * 0.3
+      setStreamLevel(smoothedLevelRef.current)
+    }, 100)
+
+    return () => clearInterval(interval)
+  }, [isStreaming, streamingContent])
+
+  const coreState: CoreState = isListening
+    ? 'listening'
+    : isStreaming
+    ? (streamingContent ? 'speaking' : 'thinking')
+    : isSpeaking
+    ? 'speaking'
+    : 'idle'
+
+  const coreLevel = isListening ? 0.6 : streamLevel
+
+  // Check backend config
+  useEffect(() => {
+    fetch('/api/chat')
+      .then(r => r.json())
+      .then(data => {
+        if (data.status) {
+          setConfigStatus(data.status)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   // Scroll anchor ref
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
@@ -135,57 +192,31 @@ export default function ChatWindow() {
     return () => el.removeEventListener('scroll', handleScroll)
   }, [currentConversation])
 
-  // Check server configuration on mount
-  useEffect(() => {
-    fetch('/api/chat')
-      .then(r => r.json())
-      .then(status => {
-        setConfigStatus(status)
-        if (status.provider && status.model) {
-          updatePreferences({
-            provider: status.provider,
-            model: status.model,
-          })
-        }
-      })
-      .catch(() => {
-        setConfigStatus({
-          configured: false,
-          provider: 'gemini',
-          model: 'gemini-2.0-flash',
-          error: 'Could not connect to the backend server.',
-        })
-      })
-  }, [])
-
-  // Auto-collapse sidebar on small mobile screens initially
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      setSidebarOpen(false)
-    }
-  }, [])
-
-  // Delete conversation with undo toast
+  // Delete conversation with toast undo
   const handleDeleteConversation = useCallback(
     async (id: string) => {
-      const { conversation: deleted } = await deleteConversation(id)
-      if (deleted) {
-        toast('Conversation deleted', {
+      const conv = conversations.find(c => c.id === id)
+      await deleteConversation(id)
+
+      if (conv) {
+        toast(`Archived "${conv.title}"`, {
           action: {
-            label: 'Undo',
-            onClick: () => undoDelete(deleted),
+            label: 'UNDO',
+            onClick: async () => {
+              await undoDelete(conv)
+            },
           },
         })
       }
     },
-    [deleteConversation, undoDelete, toast]
+    [conversations, deleteConversation, undoDelete, toast]
   )
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
     onNewChat: () => createConversation(),
     onToggleSidebar: () => setSidebarOpen(prev => !prev),
-    onOpenPalette: () => setIsPaletteOpen(true),
+    onOpenPalette: () => setIsPaletteOpen(prev => !prev),
     onStopStreaming: () => {
       if (isStreaming) stopStreaming()
     },
@@ -199,21 +230,18 @@ export default function ChatWindow() {
     },
   })
 
-  // Open settings
   const handleOpenSettings = () => {
     setIsSettingsOpen(true)
   }
 
-  // Copy handler
   const handleCopy = useCallback(
     (text: string) => {
       navigator.clipboard.writeText(text)
-      toast('Copied to clipboard')
+      toast('COPIED TO CLIPBOARD')
     },
     [toast]
   )
 
-  // Voice start handler
   const handleVoiceStart = useCallback(() => {
     if (isListening) return
     startListening((transcript: string) => {
@@ -223,29 +251,34 @@ export default function ChatWindow() {
     })
   }, [isListening, startListening, sendMessage])
 
-  // Show setup screen if server reports no API key
   if (configStatus && !configStatus.configured) {
     return <SetupScreen provider={configStatus.provider} error={configStatus.error} />
   }
 
   if (isStorageLoading) {
     return (
-      <div className="flex items-center justify-center h-[100dvh] bg-[var(--color-bg)]">
-        <span className="text-ui-base text-[var(--color-text-secondary)]">Loading...</span>
+      <div className="flex items-center justify-center h-[100dvh] bg-[var(--bg)] font-hud text-sm tracking-wider text-[var(--cyan)]">
+        SYSTEM BOOTING...
       </div>
     )
   }
 
   const grouped = getGroupedConversations()
-  const currentTitle = currentConversation?.title || 'New conversation'
+  const currentTitle = currentConversation?.title || 'NEW PROTOCOL'
   const modelName = preferences.model || configStatus?.model || 'gemini-2.0-flash'
+  const hasMessages = Boolean(
+    (currentConversation?.messages && currentConversation.messages.length > 0) || isStreaming
+  )
 
   return (
-    <div className="flex h-[100dvh] w-full bg-[var(--color-bg)] overflow-hidden">
+    <div className="flex h-[100dvh] w-full bg-[var(--bg)] text-[var(--text)] overflow-hidden relative">
+      {/* Faint HUD backdrop: fixed full-screen CSS grid (60px cells, cyan at 4% opacity) with radial vignette */}
+      <div className="hud-grid-backdrop pointer-events-none" />
+
       {/* Offline banner */}
       {!isOnline && (
-        <div className="fixed top-0 inset-x-0 z-50 bg-[var(--color-destructive)] text-white text-center py-1 text-xs font-medium">
-          You are currently offline. Responses will resume when your connection is restored.
+        <div className="fixed top-0 inset-x-0 z-50 bg-[var(--red)] text-white text-center py-1 font-hud text-xs tracking-wider">
+          OFFLINE PROTOCOL ENGAGED · RECONNECTING...
         </div>
       )}
 
@@ -263,7 +296,7 @@ export default function ChatWindow() {
       />
 
       {/* Main Chat Area */}
-      <main className="flex-1 flex flex-col h-full relative min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col h-full relative min-w-0 overflow-hidden z-10">
         {/* Top Bar */}
         <TopBar
           title={currentTitle}
@@ -277,18 +310,21 @@ export default function ChatWindow() {
               renameConversation(currentConversation.id, newTitle)
             }
           }}
+          isOnline={isOnline}
+          hasMessages={hasMessages}
+          coreState={coreState}
         />
 
         {/* Inline error banner if any */}
         {chatError && (
-          <div className="mx-auto max-w-[720px] w-full px-4 pt-2">
-            <div className="flex items-center justify-between px-3 py-2 rounded-card bg-[var(--color-destructive)]/10 border border-[var(--color-destructive)]/30 text-ui-sm text-[var(--color-destructive)]">
+          <div className="mx-auto max-w-[720px] w-full px-4 pt-2 z-20">
+            <div className="holo flex items-center justify-between px-3 py-2 bg-[var(--surface-hi)] border border-[var(--red)] text-xs font-mono text-[var(--red)]">
               <span>{chatError}</span>
               <button
                 onClick={retry}
-                className="underline hover:opacity-80 font-medium ml-2"
+                className="underline hover:opacity-80 font-hud uppercase tracking-wider ml-2 cursor-pointer"
               >
-                Retry
+                RETRY
               </button>
             </div>
           </div>
@@ -312,6 +348,8 @@ export default function ChatWindow() {
           isReading={isSpeaking}
           onSuggestionClick={prompt => sendMessage(prompt)}
           scrollContainerRef={scrollContainerRef}
+          state={coreState}
+          level={coreLevel}
         />
 
         {/* Scroll to Bottom Button */}

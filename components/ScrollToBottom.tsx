@@ -20,7 +20,7 @@ export function ScrollToBottom({ visible, onClick }: ScrollToBottomProps) {
           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
           onClick={onClick}
           aria-label="Scroll to latest messages"
-          className="fixed bottom-28 right-8 z-30 w-9 h-9 rounded-full bg-[var(--color-surface)] border border-[var(--color-separator)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] shadow-float flex items-center justify-center transition-transform active:scale-95"
+          className="holo fixed bottom-28 right-8 z-30 w-10 h-10 border border-[var(--cyan)] text-[var(--cyan)] bg-[var(--surface-hi)] shadow-[var(--glow-cyan)] flex items-center justify-center transition-transform active:scale-95 cursor-pointer"
         >
           <ChevronDown size={18} strokeWidth={1.5} />
         </motion.button>

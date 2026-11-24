@@ -12,20 +12,29 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: [
+          'var(--font-sans)',
+          'Inter',
           '-apple-system',
           'BlinkMacSystemFont',
-          '"SF Pro Text"',
-          '"SF Pro Display"',
-          '"Inter"',
           'system-ui',
           'sans-serif',
         ],
         mono: [
-          '"SF Mono"',
+          'var(--font-mono)',
+          'JetBrains Mono',
           'ui-monospace',
-          '"JetBrains Mono"',
           'Menlo',
           'monospace',
+        ],
+        rajdhani: [
+          'var(--font-rajdhani)',
+          'Rajdhani',
+          'sans-serif',
+        ],
+        orbitron: [
+          'var(--font-orbitron)',
+          'Orbitron',
+          'sans-serif',
         ],
       },
       maxWidth: {

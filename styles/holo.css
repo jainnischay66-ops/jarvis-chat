@@ -1,0 +1,235 @@
+/**
+ * Hologram Utilities & Stark HUD Styling
+ */
+
+/* Fixed full-screen CSS grid (60px cells, cyan at 4% opacity) with radial vignette to var(--bg) */
+.hud-grid-backdrop {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(to right, rgba(92, 203, 245, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(92, 203, 245, 0.04) 1px, transparent 1px),
+    radial-gradient(ellipse at center, transparent 20%, var(--bg) 85%);
+  background-size: 60px 60px, 60px 60px, 100% 100%;
+}
+
+/* .holo panel */
+.holo {
+  position: relative;
+  background: var(--surface);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid var(--line);
+  clip-path: polygon(
+    var(--chamfer) 0,
+    100% 0,
+    100% calc(100% - var(--chamfer)),
+    calc(100% - var(--chamfer)) 100%,
+    0 100%,
+    0 var(--chamfer)
+  );
+}
+
+@supports not (backdrop-filter: blur(16px)) {
+  .holo {
+    background: rgba(8, 20, 32, 0.94);
+  }
+}
+
+/* Four corner brackets (10px L-shapes, 1.5px, var(--cyan)) drawn with linear-gradients */
+.holo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background-image:
+    linear-gradient(to right, var(--cyan) 10px, transparent 10px),
+    linear-gradient(to bottom, var(--cyan) 10px, transparent 10px),
+    linear-gradient(to left, var(--cyan) 10px, transparent 10px),
+    linear-gradient(to bottom, var(--cyan) 10px, transparent 10px),
+    linear-gradient(to right, var(--cyan) 10px, transparent 10px),
+    linear-gradient(to top, var(--cyan) 10px, transparent 10px),
+    linear-gradient(to left, var(--cyan) 10px, transparent 10px),
+    linear-gradient(to top, var(--cyan) 10px, transparent 10px);
+  background-position:
+    top left, top left,
+    top right, top right,
+    bottom left, bottom left,
+    bottom right, bottom right;
+  background-size:
+    10px 1.5px, 1.5px 10px,
+    10px 1.5px, 1.5px 10px,
+    10px 1.5px, 1.5px 10px,
+    10px 1.5px, 1.5px 10px;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 0 4px var(--cyan));
+}
+
+/* Scanlines: repeating-linear-gradient(0deg, rgba(92,203,245,.035) 0 1px, transparent 1px 3px), pointer-events:none */
+/* Apply to panel chrome, sidebar, top bar, composer only, never over message text */
+.holo-chrome::after,
+.holo-scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(92, 203, 245, 0.035) 0 1px,
+    transparent 1px 3px
+  );
+  z-index: 1;
+}
+
+/* 1px cyan line that sweeps top to bottom once every 9s, opacity .25 */
+.holo-sweep {
+  position: relative;
+  overflow: hidden;
+}
+
+.holo-sweep::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--cyan);
+  opacity: 0.25;
+  box-shadow: var(--glow-cyan);
+  animation: holoSweep 9s linear infinite;
+  pointer-events: none;
+  z-index: 3;
+}
+
+@keyframes holoSweep {
+  0% { transform: translateY(-10px); }
+  100% { transform: translateY(100vh); }
+}
+
+/* One-time 280ms flicker (opacity 0.4, 1, 0.6, 1) on mount */
+.holo-flicker {
+  animation: holoFlicker 280ms ease-out forwards;
+}
+
+@keyframes holoFlicker {
+  0% { opacity: 0.4; }
+  33% { opacity: 1; }
+  66% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+/* Font helpers */
+.font-wordmark {
+  font-family: var(--font-orbitron), sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.font-hud {
+  font-family: var(--font-rajdhani), sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.font-mono-readout {
+  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.font-body-inter {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  text-transform: none !important;
+}
+
+/* ArcReactor animations */
+@keyframes reactorSpinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes reactorSpinRev {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes reactorSpinFast {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes reactorPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+@keyframes reactorBreathe {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
+}
+
+.reactor-spin-slow {
+  transform-origin: center;
+  animation: reactorSpinSlow 16s linear infinite;
+}
+
+.reactor-spin-rev {
+  transform-origin: center;
+  animation: reactorSpinRev 12s linear infinite;
+}
+
+.reactor-spin-fast {
+  transform-origin: center;
+  animation: reactorSpinFast 1.8s linear infinite;
+}
+
+.reactor-pulse {
+  transform-origin: center;
+  animation: reactorPulse 1.2s ease-in-out infinite;
+}
+
+.reactor-breathe {
+  transform-origin: center;
+  animation: reactorBreathe 2s ease-in-out infinite;
+}
+
+/* Preferences & Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .holo-sweep::after,
+  .holo-flicker,
+  .reactor-spin-slow,
+  .reactor-spin-rev,
+  .reactor-spin-fast,
+  .reactor-pulse,
+  .reactor-breathe {
+    animation: none !important;
+  }
+  .holo-sweep::after {
+    display: none !important;
+  }
+}
+
+[data-holo="false"] .holo::before,
+[data-holo="false"] .holo-sweep::after,
+[data-holo="false"] .holo-flicker,
+[data-holo="false"] .reactor-spin-slow,
+[data-holo="false"] .reactor-spin-rev,
+[data-holo="false"] .reactor-spin-fast,
+[data-holo="false"] .reactor-pulse,
+[data-holo="false"] .reactor-breathe {
+  filter: none !important;
+  animation: none !important;
+}
+
+[data-holo="false"] .holo-sweep::after {
+  display: none !important;
+}
+
+[data-scanlines="false"] .holo-chrome::after,
+[data-scanlines="false"] .holo-scanlines::after {
+  display: none !important;
+}

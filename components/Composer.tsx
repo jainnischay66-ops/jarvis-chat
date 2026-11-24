@@ -107,7 +107,6 @@ export function Composer({
     if (!files || files.length === 0) return
 
     Array.from(files).forEach(file => {
-      // Validate file size: 10MB limit
       if (file.size > 10 * 1024 * 1024) {
         alert('File size exceeds the 10MB limit.')
         return
@@ -175,6 +174,13 @@ export function Composer({
 
   const hasContent = Boolean(text.trim() || attachments.length > 0)
 
+  // Mono status line above composer: "LISTENING", "THINKING", "READY"
+  const statusLabel = isListening
+    ? 'LISTENING'
+    : isStreaming
+    ? 'THINKING'
+    : 'READY'
+
   return (
     <div
       style={{
@@ -183,13 +189,41 @@ export function Composer({
       className="fixed left-0 right-0 z-20 px-4 pointer-events-none transition-[bottom] duration-100 ease-out"
     >
       <div className="max-w-[720px] mx-auto pointer-events-auto">
+        {/* Status Line above composer */}
+        <div className="flex items-center justify-between px-2 pb-1.5 font-mono text-[11px] tracking-widest uppercase select-none">
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                isListening
+                  ? 'bg-[var(--cyan)] shadow-[var(--glow-cyan)] animate-pulse'
+                  : isStreaming
+                  ? 'bg-[var(--gold)] shadow-[var(--glow-gold)] animate-pulse'
+                  : 'bg-[var(--cyan-dim)]'
+              }`}
+            />
+            <span
+              className={
+                isListening
+                  ? 'text-[var(--cyan)]'
+                  : isStreaming
+                  ? 'text-[var(--gold)]'
+                  : 'text-[var(--text-3)]'
+              }
+            >
+              {statusLabel}
+            </span>
+          </div>
+          <span className="text-[var(--text-3)] text-[10px]">PROTOCOL MK-VII</span>
+        </div>
+
         {/* Drag and drop overlay */}
         {isDragging && (
-          <div className="mb-2 p-6 rounded-card drop-overlay flex items-center justify-center text-ui-sm font-medium text-[var(--color-accent)] select-none">
-            Drop files here to attach
+          <div className="holo mb-2 p-6 flex items-center justify-center font-hud text-sm tracking-wider text-[var(--cyan)] select-none">
+            DROP ARCHIVES TO TRANSMIT
           </div>
         )}
 
+        {/* Chamfered .holo Composer Bar */}
         <div
           onDragOver={e => {
             e.preventDefault()
@@ -201,15 +235,15 @@ export function Composer({
             setIsDragging(false)
             handleFileSelect(e.dataTransfer.files)
           }}
-          className="relative bg-[var(--color-surface-translucent)] backdrop-blur-[20px] rounded-composer border border-[var(--color-separator)] shadow-float p-2.5 transition-all"
+          className="holo holo-chrome relative bg-[var(--surface)] border border-[var(--line)] p-2.5 transition-all shadow-float"
         >
           {/* Editing Banner */}
           {editingMessage && (
-            <div className="flex items-center justify-between px-2 pb-2 mb-1 border-b border-[var(--color-separator)] text-xs text-[var(--color-text-secondary)]">
-              <span>Editing message</span>
+            <div className="flex items-center justify-between px-2 pb-2 mb-1 border-b border-[var(--line)] font-mono text-xs text-[var(--text-2)]">
+              <span>EDITING MESSAGE DIRECTIVE</span>
               <button
                 onClick={onCancelEdit}
-                className="hover:text-[var(--color-text)] underline"
+                className="text-[var(--cyan)] hover:underline uppercase tracking-wider"
               >
                 Cancel
               </button>
@@ -218,16 +252,16 @@ export function Composer({
 
           {/* Attachment Chips */}
           {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-2 pb-2 mb-1 border-b border-[var(--color-separator)]">
+            <div className="flex flex-wrap gap-2 px-2 pb-2 mb-1 border-b border-[var(--line)]">
               {attachments.map(att => (
                 <div
                   key={att.id}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-card bg-[var(--color-surface-secondary)] border border-[var(--color-separator)] text-xs text-[var(--color-text)] select-none"
+                  className="holo flex items-center gap-1.5 px-2.5 py-1 bg-[var(--surface-hi)] border border-[var(--line)] text-xs text-[var(--text)] select-none"
                 >
-                  <span className="truncate max-w-[120px]">{att.name}</span>
+                  <span className="truncate max-w-[140px] font-mono text-[11px]">{att.name}</span>
                   <button
                     onClick={() => removeAttachment(att.id)}
-                    className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text)] ml-1"
+                    className="text-[var(--text-3)] hover:text-[var(--cyan)] ml-1"
                   >
                     <X size={12} strokeWidth={2} />
                   </button>
@@ -251,7 +285,7 @@ export function Composer({
               disabled={isStreaming}
               aria-label="Attach file or image"
               title="Attach"
-              className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-secondary)] active:scale-95 disabled:opacity-40 transition-all flex-shrink-0"
+              className="w-11 h-11 flex items-center justify-center text-[var(--text-2)] hover:text-[var(--cyan)] hover:bg-[var(--surface-hi)] active:scale-95 disabled:opacity-30 transition-all flex-shrink-0 cursor-pointer"
             >
               <Paperclip size={18} strokeWidth={1.5} />
             </button>
@@ -263,9 +297,9 @@ export function Composer({
               onChange={handleTextChange}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder="Message Jarvis"
+              placeholder="Message J.A.R.V.I.S."
               rows={1}
-              className="flex-1 bg-transparent text-body text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] resize-none outline-none py-1.5 max-h-[200px] overflow-y-auto leading-relaxed"
+              className="flex-1 bg-transparent font-sans text-body text-[var(--text)] placeholder-[var(--text-3)] resize-none outline-none py-2 max-h-[200px] overflow-y-auto leading-relaxed"
             />
 
             {/* Voice button */}
@@ -274,39 +308,69 @@ export function Composer({
                 onClick={onVoiceStart}
                 aria-label={isListening ? 'Listening...' : 'Voice input'}
                 title="Voice input"
-                className={`w-9 h-9 rounded-full flex items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-secondary)] active:scale-95 transition-all flex-shrink-0 ${
-                  isListening ? 'text-[var(--color-accent)] voice-pulse' : ''
+                className={`w-11 h-11 flex items-center justify-center text-[var(--text-2)] hover:text-[var(--cyan)] hover:bg-[var(--surface-hi)] active:scale-95 transition-all flex-shrink-0 cursor-pointer ${
+                  isListening ? 'text-[var(--cyan)] shadow-[var(--glow-cyan)] animate-pulse' : ''
                 }`}
               >
                 <Mic size={18} strokeWidth={1.5} />
               </button>
             )}
 
-            {/* Send or Stop button */}
-            {isStreaming ? (
-              <button
-                onClick={onStop}
-                aria-label="Stop generating response"
-                title="Stop (Esc)"
-                className="w-9 h-9 rounded-button bg-[var(--color-destructive)] text-white flex items-center justify-center active:scale-95 transition-all flex-shrink-0 shadow-sm"
-              >
-                <Square size={14} fill="currentColor" strokeWidth={1.5} />
-              </button>
-            ) : (
-              <button
-                onClick={handleAction}
-                disabled={!hasContent}
-                aria-label="Send message"
-                title="Send (Enter)"
-                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
-                  hasContent
-                    ? 'bg-[var(--color-accent)] text-white shadow-sm hover:opacity-90 active:scale-95'
-                    : 'bg-[var(--color-surface-secondary)] text-[var(--color-text-tertiary)] opacity-50 cursor-not-allowed'
+            {/* 44px circular reactor send button */}
+            <button
+              onClick={handleAction}
+              disabled={!isStreaming && !hasContent}
+              aria-label={isStreaming ? 'Stop generating' : 'Send message'}
+              title={isStreaming ? 'Stop (Esc)' : 'Send (Enter)'}
+              className={`relative w-11 h-11 flex items-center justify-center flex-shrink-0 transition-transform active:scale-95 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed group`}
+            >
+              {/* Concentric rings */}
+              <svg
+                viewBox="0 0 44 44"
+                className={`absolute inset-0 w-full h-full pointer-events-none ${
+                  isStreaming ? 'text-[var(--red)]' : 'text-[var(--cyan)]'
                 }`}
               >
-                <ArrowUp size={18} strokeWidth={2} />
-              </button>
-            )}
+                {/* Outer ring */}
+                <circle
+                  cx="22"
+                  cy="22"
+                  r="20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeDasharray={isStreaming ? '18 6 12 6' : '36 6 12 6'}
+                  className={isStreaming ? 'reactor-spin-fast' : 'group-hover:opacity-100'}
+                  opacity={isStreaming ? '1' : hasContent ? '0.9' : '0.4'}
+                />
+                {/* Inner ring */}
+                <circle
+                  cx="22"
+                  cy="22"
+                  r="14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeDasharray="10 4"
+                  opacity={isStreaming ? '1' : hasContent ? '0.8' : '0.3'}
+                />
+              </svg>
+
+              {/* Center icon */}
+              {isStreaming ? (
+                <Square size={13} className="fill-[var(--red)] text-[var(--red)] relative z-10" />
+              ) : (
+                <ArrowUp
+                  size={16}
+                  strokeWidth={2}
+                  className={`relative z-10 transition-colors ${
+                    hasContent
+                      ? 'text-[var(--cyan)] filter drop-shadow-[0_0_6px_var(--cyan)]'
+                      : 'text-[var(--text-3)]'
+                  }`}
+                />
+              )}
+            </button>
           </div>
         </div>
       </div>

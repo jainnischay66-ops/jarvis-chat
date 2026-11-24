@@ -16,7 +16,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
   isStreaming = false,
 }: MarkdownRendererProps) {
   return (
-    <div className="prose dark:prose-invert max-w-none text-body text-[var(--color-text)] leading-relaxed space-y-3">
+    <div className="prose dark:prose-invert max-w-none font-body-inter text-[var(--text)] leading-relaxed space-y-3">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeSanitize]}
@@ -28,7 +28,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
             if (isInline) {
               return (
                 <code
-                  className="px-1.5 py-0.5 rounded-sm bg-[var(--color-surface-secondary)] text-[var(--color-text)] font-mono text-ui-sm border border-[var(--color-separator)]"
+                  className="px-1.5 py-0.5 bg-[var(--surface-hi)] text-[var(--cyan)] font-mono text-xs border border-[var(--line)]"
                   {...props}
                 >
                   {children}
@@ -50,7 +50,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[var(--color-accent)] hover:underline font-medium inline-flex items-center gap-0.5"
+                className="text-[var(--cyan)] hover:underline font-medium inline-flex items-center gap-0.5"
               >
                 {children}
               </a>
@@ -58,8 +58,8 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
           },
           table({ children }: any) {
             return (
-              <div className="overflow-x-auto my-3 border border-[var(--color-separator)] rounded-code">
-                <table className="w-full text-left border-collapse text-ui-sm">
+              <div className="holo overflow-x-auto my-3 border border-[var(--line)]">
+                <table className="w-full text-left border-collapse text-xs font-mono">
                   {children}
                 </table>
               </div>
@@ -67,21 +67,21 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
           },
           th({ children }: any) {
             return (
-              <th className="border-b border-[var(--color-separator)] bg-[var(--color-surface-secondary)] px-4 py-2.5 font-semibold text-[var(--color-text)]">
+              <th className="border-b border-[var(--line)] bg-[var(--surface-hi)] px-4 py-2.5 font-hud tracking-wider text-[var(--cyan)] uppercase">
                 {children}
               </th>
             )
           },
           td({ children }: any) {
             return (
-              <td className="border-b border-[var(--color-separator)] px-4 py-2.5 text-[var(--color-text)]">
+              <td className="border-b border-[var(--line)] px-4 py-2.5 text-[var(--text)]">
                 {children}
               </td>
             )
           },
           blockquote({ children }: any) {
             return (
-              <blockquote className="border-l-2 border-[var(--color-accent)] pl-4 py-1 italic text-[var(--color-text-secondary)] my-3">
+              <blockquote className="border-l-2 border-[var(--gold)] pl-4 py-1 italic text-[var(--text-2)] my-3 bg-[var(--surface)]">
                 {children}
               </blockquote>
             )
@@ -94,21 +94,21 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
           },
           h1({ children }: any) {
             return (
-              <h1 className="text-xl font-semibold tracking-tight text-[var(--color-text)] mt-4 mb-2">
+              <h1 className="font-hud text-xl font-semibold tracking-wider uppercase text-[var(--text)] mt-4 mb-2">
                 {children}
               </h1>
             )
           },
           h2({ children }: any) {
             return (
-              <h2 className="text-lg font-semibold tracking-tight text-[var(--color-text)] mt-3 mb-1.5">
+              <h2 className="font-hud text-lg font-semibold tracking-wider uppercase text-[var(--text)] mt-3 mb-1.5">
                 {children}
               </h2>
             )
           },
           h3({ children }: any) {
             return (
-              <h3 className="text-base font-semibold text-[var(--color-text)] mt-2.5 mb-1">
+              <h3 className="font-hud text-base font-semibold tracking-wider uppercase text-[var(--cyan-dim)] mt-2.5 mb-1">
                 {children}
               </h3>
             )
@@ -120,9 +120,8 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
       >
         {content}
       </ReactMarkdown>
-
       {isStreaming && (
-        <span className="streaming-cursor" aria-hidden="true" />
+        <span className="inline-block w-2 h-4 bg-[var(--cyan)] shadow-[var(--glow-cyan)] ml-1 animate-pulse align-middle" />
       )}
     </div>
   )

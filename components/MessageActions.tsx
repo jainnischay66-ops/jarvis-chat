@@ -32,7 +32,7 @@ export function MessageActions({
 
   return (
     <div
-      className={`flex items-center gap-1 mt-1.5 text-[var(--color-text-tertiary)] select-none transition-opacity duration-150 ${
+      className={`flex items-center gap-1.5 mt-1.5 text-[var(--text-3)] select-none transition-opacity duration-150 ${
         visible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
       }`}
     >
@@ -40,10 +40,10 @@ export function MessageActions({
         onClick={handleCopy}
         aria-label="Copy message"
         title="Copy"
-        className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[var(--color-surface-secondary)] hover:text-[var(--color-text)] active:scale-95 transition-all"
+        className="w-7 h-7 rounded flex items-center justify-center hover:bg-[var(--surface-hi)] hover:text-[var(--cyan)] active:scale-95 transition-all cursor-pointer"
       >
         {copied ? (
-          <Check size={14} strokeWidth={1.5} className="text-[var(--color-accent)]" />
+          <Check size={14} strokeWidth={1.5} className="text-[var(--gold)]" />
         ) : (
           <Copy size={14} strokeWidth={1.5} />
         )}
@@ -54,7 +54,7 @@ export function MessageActions({
           onClick={onRegenerate}
           aria-label="Regenerate response"
           title="Regenerate"
-          className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[var(--color-surface-secondary)] hover:text-[var(--color-text)] active:scale-95 transition-all"
+          className="w-7 h-7 rounded flex items-center justify-center hover:bg-[var(--surface-hi)] hover:text-[var(--cyan)] active:scale-95 transition-all cursor-pointer"
         >
           <RotateCw size={14} strokeWidth={1.5} />
         </button>
@@ -65,8 +65,8 @@ export function MessageActions({
           onClick={onReadAloud}
           aria-label={isReading ? 'Stop speaking' : 'Read aloud'}
           title={isReading ? 'Stop speaking' : 'Read aloud'}
-          className={`w-7 h-7 rounded-full flex items-center justify-center hover:bg-[var(--color-surface-secondary)] hover:text-[var(--color-text)] active:scale-95 transition-all ${
-            isReading ? 'text-[var(--color-accent)]' : ''
+          className={`w-7 h-7 rounded flex items-center justify-center hover:bg-[var(--surface-hi)] hover:text-[var(--cyan)] active:scale-95 transition-all cursor-pointer ${
+            isReading ? 'text-[var(--gold)]' : ''
           }`}
         >
           {isReading ? <VolumeX size={14} strokeWidth={1.5} /> : <Volume2 size={14} strokeWidth={1.5} />}
@@ -78,7 +78,7 @@ export function MessageActions({
           onClick={onEdit}
           aria-label="Edit message"
           title="Edit"
-          className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[var(--color-surface-secondary)] hover:text-[var(--color-text)] active:scale-95 transition-all"
+          className="w-7 h-7 rounded flex items-center justify-center hover:bg-[var(--surface-hi)] hover:text-[var(--cyan)] active:scale-95 transition-all cursor-pointer"
         >
           <Pencil size={14} strokeWidth={1.5} />
         </button>

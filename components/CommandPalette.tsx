@@ -3,19 +3,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Search,
-  Plus,
-  Settings,
-  Sun,
-  Moon,
-  Monitor,
-  Cpu,
-  MessageSquare,
-} from 'lucide-react'
-import { useTheme } from './ThemeProvider'
+import { Search, Plus, Settings, MessageSquare } from 'lucide-react'
 import type { Conversation, UIPreferences } from '@/lib/storage'
-import type { ProviderName } from '@/lib/llm/types'
 
 interface CommandPaletteProps {
   isOpen: boolean
@@ -35,7 +24,7 @@ interface PaletteAction {
   shortcut?: string
   icon: React.ReactNode
   perform: () => void
-  group: 'Actions' | 'Theme' | 'Model' | 'Conversations'
+  group: 'Actions' | 'Conversations'
 }
 
 export function CommandPalette({
@@ -45,15 +34,11 @@ export function CommandPalette({
   onOpenSettings,
   onSelectConversation,
   conversations,
-  preferences,
-  onUpdatePreferences,
 }: CommandPaletteProps) {
-  const { setTheme } = useTheme()
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
 
-  // Reset query and selected index whenever opened
   useEffect(() => {
     if (isOpen) {
       setQuery('')
@@ -61,14 +46,13 @@ export function CommandPalette({
     }
   }, [isOpen])
 
-  // Build items list
   const allActions = useMemo(() => {
     const list: PaletteAction[] = [
       {
         id: 'new-chat',
-        label: 'New conversation',
+        label: 'INITIALIZE NEW PROTOCOL',
         shortcut: '⌘⇧O',
-        icon: <Plus size={16} strokeWidth={1.5} className="text-[var(--color-accent)]" />,
+        icon: <Plus size={16} strokeWidth={1.5} className="text-[var(--cyan)]" />,
         perform: () => {
           onNewChat()
           onClose()
@@ -77,161 +61,63 @@ export function CommandPalette({
       },
       {
         id: 'open-settings',
-        label: 'Open settings',
-        icon: <Settings size={16} strokeWidth={1.5} />,
+        label: 'OPEN SYSTEM CONFIGURATION',
+        shortcut: '⌘,',
+        icon: <Settings size={16} strokeWidth={1.5} className="text-[var(--cyan)]" />,
         perform: () => {
           onOpenSettings()
           onClose()
         },
         group: 'Actions',
       },
-      {
-        id: 'theme-light',
-        label: 'Switch to light mode',
-        icon: <Sun size={16} strokeWidth={1.5} />,
-        perform: () => {
-          setTheme('light')
-          onClose()
-        },
-        group: 'Theme',
-      },
-      {
-        id: 'theme-dark',
-        label: 'Switch to dark mode',
-        icon: <Moon size={16} strokeWidth={1.5} />,
-        perform: () => {
-          setTheme('dark')
-          onClose()
-        },
-        group: 'Theme',
-      },
-      {
-        id: 'theme-system',
-        label: 'Switch to system theme',
-        icon: <Monitor size={16} strokeWidth={1.5} />,
-        perform: () => {
-          setTheme('system')
-          onClose()
-        },
-        group: 'Theme',
-      },
-      {
-        id: 'provider-openai',
-        label: 'Use OpenAI-compatible provider',
-        sublabel: preferences.provider === 'openai-compatible' ? 'Active' : undefined,
-        icon: <Cpu size={16} strokeWidth={1.5} />,
-        perform: () => {
-          onUpdatePreferences({ provider: 'openai-compatible' })
-          onClose()
-        },
-        group: 'Model',
-      },
-      {
-        id: 'provider-gemini',
-        label: 'Use Google Gemini provider',
-        sublabel: preferences.provider === 'gemini' ? 'Active' : undefined,
-        icon: <Cpu size={16} strokeWidth={1.5} />,
-        perform: () => {
-          onUpdatePreferences({ provider: 'gemini', model: 'gemini-2.0-flash' })
-          onClose()
-        },
-        group: 'Model',
-      },
-      {
-        id: 'provider-anthropic',
-        label: 'Use Anthropic Claude provider',
-        sublabel: preferences.provider === 'anthropic' ? 'Active' : undefined,
-        icon: <Cpu size={16} strokeWidth={1.5} />,
-        perform: () => {
-          onUpdatePreferences({ provider: 'anthropic', model: 'claude-sonnet-4-20250514' })
-          onClose()
-        },
-        group: 'Model',
-      },
     ]
 
-    // Append matching conversations
-    for (const c of conversations) {
+    // Add recent conversations
+    conversations.slice(0, 15).forEach(c => {
       list.push({
         id: `conv-${c.id}`,
         label: c.title,
         sublabel: new Date(c.updatedAt).toLocaleDateString(),
-        icon: <MessageSquare size={16} strokeWidth={1.5} />,
+        icon: <MessageSquare size={16} strokeWidth={1.5} className="text-[var(--text-3)]" />,
         perform: () => {
           onSelectConversation(c.id)
           onClose()
         },
         group: 'Conversations',
       })
-    }
+    })
 
     return list
-  }, [
-    conversations,
-    preferences.provider,
-    onNewChat,
-    onOpenSettings,
-    onSelectConversation,
-    setTheme,
-    onUpdatePreferences,
-    onClose,
-  ])
+  }, [onNewChat, onOpenSettings, onSelectConversation, conversations, onClose])
 
-  // Filter actions based on search query
-  const filteredActions = useMemo(() => {
+  const filtered = useMemo(() => {
     if (!query.trim()) return allActions
     const q = query.toLowerCase()
     return allActions.filter(
-      a =>
-        a.label.toLowerCase().includes(q) ||
-        (a.sublabel && a.sublabel.toLowerCase().includes(q)) ||
-        a.group.toLowerCase().includes(q)
+      item =>
+        item.label.toLowerCase().includes(q) ||
+        item.sublabel?.toLowerCase().includes(q)
     )
   }, [allActions, query])
 
-  // Group filtered items
-  const groupedActions = useMemo(() => {
-    const groups: { [key: string]: PaletteAction[] } = {}
-    for (const a of filteredActions) {
-      if (!groups[a.group]) groups[a.group] = []
-      groups[a.group].push(a)
-    }
-    return groups
-  }, [filteredActions])
-
-  // Reset selected index when filtered list changes
   useEffect(() => {
     setSelectedIndex(0)
-  }, [filteredActions])
+  }, [query])
 
-  // Scroll selected item into view
-  useEffect(() => {
-    const el = listRef.current?.querySelector(`[data-index="${selectedIndex}"]`)
-    if (el) {
-      el.scrollIntoView({ block: 'nearest' })
-    }
-  }, [selectedIndex])
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (filteredActions.length === 0) return
-
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setSelectedIndex(prev => (prev + 1) % filteredActions.length)
+      setSelectedIndex(prev => (prev + 1) % Math.max(1, filtered.length))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setSelectedIndex(prev => (prev - 1 + filteredActions.length) % filteredActions.length)
+      setSelectedIndex(prev => (prev - 1 + filtered.length) % Math.max(1, filtered.length))
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      const current = filteredActions[selectedIndex]
-      if (current) {
-        current.perform()
+      if (filtered[selectedIndex]) {
+        filtered[selectedIndex].perform()
       }
     }
   }
-
-  // Linear index calculation for grouped list
-  let runningIndex = 0
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={open => !open && onClose()}>
@@ -244,117 +130,90 @@ export function CommandPalette({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+                className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md"
               />
             </Dialog.Overlay>
 
-            <Dialog.Content asChild>
-              <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 px-4 pointer-events-none">
+            <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] px-4 pointer-events-none">
+              <Dialog.Content asChild>
                 <motion.div
                   initial={{ opacity: 0, scale: 0.96, y: -10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.96, y: -10 }}
                   transition={{ type: 'spring', stiffness: 450, damping: 35 }}
-                  className="w-full max-w-[580px] bg-[var(--color-surface-translucent)] backdrop-blur-[20px] backdrop-saturate-[180%] border border-[var(--color-separator)] rounded-card shadow-float overflow-hidden pointer-events-auto flex flex-col focus:outline-none"
+                  className="holo holo-chrome pointer-events-auto w-full max-w-xl bg-[var(--surface)] border border-[var(--cyan)] shadow-[0_0_30px_rgba(92,203,245,0.2)] overflow-hidden flex flex-col focus:outline-none select-none"
+                  onKeyDown={handleKeyDown}
                 >
-                  {/* Spotlight Search Header */}
-                  <div className="flex items-center px-4 h-13 border-b border-[var(--color-separator)]">
+                  {/* Search Bar with large Rajdhani input and cyan caret */}
+                  <div className="flex items-center px-4 py-3 border-b border-[var(--line)] bg-[var(--surface-hi)]">
                     <Search
-                      size={18}
+                      size={20}
                       strokeWidth={1.5}
-                      className="text-[var(--color-text-tertiary)] mr-3 flex-shrink-0"
+                      className="text-[var(--cyan)] mr-3 flex-shrink-0"
                     />
                     <input
                       autoFocus
                       type="text"
                       value={query}
                       onChange={e => setQuery(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Type a command or search..."
-                      className="w-full h-11 bg-transparent text-ui-base text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] outline-none leading-relaxed"
+                      placeholder="ENTER TACTICAL COMMAND OR PROTOCOL..."
+                      className="flex-1 bg-transparent font-hud text-lg sm:text-xl font-semibold tracking-wider text-[var(--text)] placeholder-[var(--text-3)] outline-none caret-[var(--cyan)] uppercase"
                     />
+                    <kbd className="font-mono text-[10px] text-[var(--cyan-dim)] px-2 py-0.5 border border-[var(--line)]">
+                      ESC
+                    </kbd>
                   </div>
 
                   {/* Results List */}
                   <div
                     ref={listRef}
-                    className="max-h-[340px] overflow-y-auto p-2 space-y-3 momentum-scroll text-ui-sm select-none"
+                    className="max-h-[340px] overflow-y-auto p-2 space-y-1 momentum-scroll text-xs"
                   >
-                    {filteredActions.length === 0 ? (
-                      <div className="py-8 text-center text-[var(--color-text-tertiary)] text-ui-sm">
-                        No results found for &ldquo;{query}&rdquo;
+                    {filtered.length === 0 ? (
+                      <div className="py-8 text-center font-mono text-xs text-[var(--text-3)] tracking-wider">
+                        NO PROTOCOLS MATCH COMMAND QUERY
                       </div>
                     ) : (
-                      Object.entries(groupedActions).map(([groupName, actions]) => (
-                        <div key={groupName} className="space-y-0.5">
-                          <div className="px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">
-                            {groupName}
-                          </div>
-                          {actions.map(action => {
-                            const thisIndex = runningIndex++
-                            const isSelected = thisIndex === selectedIndex
-
-                            return (
-                              <button
-                                key={action.id}
-                                data-index={thisIndex}
-                                onClick={action.perform}
-                                onMouseEnter={() => setSelectedIndex(thisIndex)}
-                                className={`w-full flex items-center justify-between px-3 py-2 rounded-button text-ui-sm transition-all text-left ${
-                                  isSelected
-                                    ? 'bg-[var(--color-surface-secondary)] text-[var(--color-text)] font-medium'
-                                    : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-secondary)]/60 hover:text-[var(--color-text)]'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <span
-                                    className={`flex-shrink-0 ${
-                                      isSelected
-                                        ? 'text-[var(--color-accent)]'
-                                        : 'text-[var(--color-text-tertiary)]'
-                                    }`}
-                                  >
-                                    {action.icon}
+                      filtered.map((item, idx) => {
+                        const isSelected = idx === selectedIndex
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() => item.perform()}
+                            onMouseEnter={() => setSelectedIndex(idx)}
+                            className={`flex items-center justify-between px-3 py-2.5 transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-[var(--surface-hi)] text-[var(--cyan)] border-l-2 border-[var(--cyan)] shadow-[inset_0_0_10px_rgba(92,203,245,0.1)]'
+                                : 'text-[var(--text)] hover:bg-[var(--surface-hi)]/50 border-l-2 border-transparent'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="flex-shrink-0">{item.icon}</span>
+                              <div className="flex flex-col truncate">
+                                <span className="font-hud tracking-wider text-xs truncate">
+                                  {item.label}
+                                </span>
+                                {item.sublabel && (
+                                  <span className="font-mono text-[10px] text-[var(--text-3)] truncate">
+                                    {item.sublabel}
                                   </span>
-                                  <span className="truncate">{action.label}</span>
-                                  {action.sublabel && (
-                                    <span className="text-xs text-[var(--color-text-tertiary)] flex-shrink-0">
-                                      {action.sublabel}
-                                    </span>
-                                  )}
-                                </div>
-
-                                {action.shortcut && (
-                                  <kbd className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-[var(--color-surface)] border border-[var(--color-separator)] text-[var(--color-text-secondary)]">
-                                    {action.shortcut}
-                                  </kbd>
                                 )}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      ))
+                              </div>
+                            </div>
+
+                            {item.shortcut && (
+                              <kbd className="font-mono text-[10px] text-[var(--text-3)] px-1.5 py-0.5 border border-[var(--line)]">
+                                {item.shortcut}
+                              </kbd>
+                            )}
+                          </div>
+                        )
+                      })
                     )}
                   </div>
-
-                  {/* Spotlight Footer */}
-                  <div className="flex items-center justify-between px-4 py-2 border-t border-[var(--color-separator)] bg-[var(--color-surface-secondary)]/50 text-[11px] text-[var(--color-text-tertiary)]">
-                    <div className="flex items-center gap-3">
-                      <span>
-                        <kbd className="font-mono">↑↓</kbd> navigate
-                      </span>
-                      <span>
-                        <kbd className="font-mono">↵</kbd> select
-                      </span>
-                      <span>
-                        <kbd className="font-mono">esc</kbd> close
-                      </span>
-                    </div>
-                    <span>Spotlight</span>
-                  </div>
                 </motion.div>
-              </div>
-            </Dialog.Content>
+              </Dialog.Content>
+            </div>
           </Dialog.Portal>
         )}
       </AnimatePresence>

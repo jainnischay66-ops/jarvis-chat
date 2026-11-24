@@ -7,7 +7,7 @@ interface SetupScreenProps {
   error?: string
 }
 
-export function SetupScreen({ provider, error }: SetupScreenProps) {
+export function SetupScreen({ provider }: SetupScreenProps) {
   const isGemini = provider === 'gemini'
   const isAnthropic = provider === 'anthropic'
   const keyName = isGemini ? 'GEMINI_API_KEY' : isAnthropic ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY'
@@ -19,42 +19,44 @@ export function SetupScreen({ provider, error }: SetupScreenProps) {
   const portalName = isGemini ? 'Google AI Studio' : isAnthropic ? 'Anthropic Console' : 'OpenAI Platform'
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[100dvh] p-6 text-center bg-[var(--color-bg)]">
-      <div className="max-w-md w-full flex flex-col items-center text-left">
-        <h1 className="text-3xl font-semibold text-[var(--color-text)] tracking-tight mb-2 text-center w-full">
-          Jarvis
+    <div className="flex flex-col items-center justify-center min-h-[100dvh] p-6 text-center bg-[var(--bg)] relative overflow-hidden select-none">
+      <div className="hud-grid-backdrop pointer-events-none" />
+
+      <div className="max-w-md w-full flex flex-col items-center text-left z-10">
+        <h1 className="font-wordmark text-3xl font-semibold text-[var(--cyan)] tracking-widest mb-1 text-center w-full filter drop-shadow-[0_0_12px_var(--cyan)]">
+          J.A.R.V.I.S.
         </h1>
-        <p className="text-ui-base text-[var(--color-text-secondary)] mb-8 text-center w-full">
-          Your personal conversational assistant.
+        <p className="font-hud text-xs text-[var(--cyan-dim)] tracking-widest uppercase mb-8 text-center w-full">
+          STARK INDUSTRIES AI PROTOCOL · AUTH REQUIRED
         </p>
 
-        <div className="w-full bg-[var(--color-surface-secondary)] rounded-card p-6 border border-[var(--color-separator)] mb-6">
-          <h2 className="text-ui-base font-semibold text-[var(--color-text)] mb-2">
-            Configure your API key
+        <div className="holo w-full bg-[var(--surface)] p-6 border border-[var(--line)] mb-6 shadow-float">
+          <h2 className="font-hud text-sm font-semibold tracking-wider text-[var(--text)] uppercase mb-2">
+            INITIALIZE AUTHENTICATION KEY
           </h2>
-          <p className="text-ui-sm text-[var(--color-text-secondary)] mb-4 leading-relaxed">
-            Create a <code className="font-mono text-xs px-1.5 py-0.5 rounded bg-[var(--color-surface)] border border-[var(--color-separator)]">.env.local</code> file in your project directory and add your key:
+          <p className="font-sans text-xs text-[var(--text-2)] mb-4 leading-relaxed">
+            Create a <code className="font-mono text-xs px-1.5 py-0.5 bg-[var(--surface-hi)] border border-[var(--line)] text-[var(--cyan)]">.env.local</code> file in your project directory and add your key:
           </p>
 
-          <div className="bg-[var(--color-surface)] p-3 rounded-code border border-[var(--color-separator)] font-mono text-xs text-[var(--color-text)] select-all mb-4 overflow-x-auto">
+          <div className="bg-[var(--surface-hi)] p-3 border border-[var(--line)] font-mono text-xs text-[var(--cyan)] select-all mb-4 overflow-x-auto">
             {keyName}=your_api_key_here
           </div>
 
-          <div className="flex items-center justify-between text-ui-sm">
-            <span className="text-[var(--color-text-secondary)]">Get an API key:</span>
+          <div className="flex items-center justify-between text-xs font-hud tracking-wider">
+            <span className="text-[var(--text-2)]">REQUEST ACCESS:</span>
             <a
               href={portalUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[var(--color-accent)] hover:underline font-medium"
+              className="text-[var(--cyan)] hover:underline font-semibold"
             >
               {portalName} &rarr;
             </a>
           </div>
         </div>
 
-        <p className="text-ui-sm text-[var(--color-text-tertiary)] text-center w-full">
-          After adding the key, restart the development server and reload this page.
+        <p className="font-mono text-xs text-[var(--text-3)] text-center w-full tracking-wider">
+          AFTER UPDATING CREDENTIALS, RESTART SERVER AND RELOAD
         </p>
       </div>
     </div>

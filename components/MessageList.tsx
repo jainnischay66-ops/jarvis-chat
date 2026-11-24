@@ -2,6 +2,7 @@
 
 import React, { RefObject } from 'react'
 import type { StoredMessage } from '@/lib/storage'
+import type { CoreState } from './JarvisCore'
 import { Message } from './Message'
 import { EmptyState } from './EmptyState'
 
@@ -16,6 +17,8 @@ interface MessageListProps {
   isReading: boolean
   onSuggestionClick: (prompt: string) => void
   scrollContainerRef: RefObject<HTMLDivElement | null>
+  state?: CoreState
+  level?: number
 }
 
 export function MessageList({
@@ -29,15 +32,23 @@ export function MessageList({
   isReading,
   onSuggestionClick,
   scrollContainerRef,
+  state = 'idle',
+  level = 0,
 }: MessageListProps) {
   if (messages.length === 0 && !isStreaming) {
-    return <EmptyState onSuggestionClick={onSuggestionClick} />
+    return (
+      <EmptyState
+        onSuggestionClick={onSuggestionClick}
+        state={state}
+        level={level}
+      />
+    )
   }
 
   return (
     <div
       ref={scrollContainerRef}
-      className="flex-1 w-full overflow-y-auto px-4 pt-16 pb-36 momentum-scroll"
+      className="flex-1 w-full overflow-y-auto px-4 pt-8 pb-36 momentum-scroll z-10"
     >
       <div className="max-w-[720px] mx-auto w-full flex flex-col justify-end min-h-full">
         {messages.map((message, idx) => (

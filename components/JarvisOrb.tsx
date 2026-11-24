@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { CoreState } from "./JarvisCore";
 
-type Live = { think: number; assemble: number; pulse: number; level: number; spin: number };
+type Live = { think: number; assemble: number; pulse: number; level: number; spin: number; warm: number };
 type V3 = [number, number, number];
 
 const BG = "#02040A";
@@ -76,12 +76,12 @@ void main(){
 }`;
 const shellFrag = /* glsl */ `
 precision highp float;
-uniform float uThink; uniform vec3 uCyan, uGold;
+uniform float uWarm; uniform vec3 uCyan, uGold;
 varying float vGlow, vSeed;
 void main(){
   float d = length(gl_PointCoord-.5); if(d>.5) discard;
   float soft = smoothstep(.5,.0,d);
-  vec3 col = mix(uCyan, uGold, clamp(uThink*.6 + step(.93,vSeed)*.9, 0., 1.));
+  vec3 col = mix(uCyan, uGold, clamp(uWarm + step(.93,vSeed)*.5, 0., 1.));
   gl_FragColor = vec4(col*vGlow*1.5, soft*soft);
 }`;
 const glowVert = /* glsl */ `
@@ -155,19 +155,20 @@ function Scene({ state, level, onActivate }: { state: CoreState; level: number; 
   const rings = useRef<THREE.Group>(null!);
   const grid = useRef<THREE.GridHelper>(null!);
   const glow = useRef<THREE.Mesh>(null!);
-  const live = useRef<Live>({ think: 0, assemble: 0, pulse: 0, level: 0, spin: 0 });
+  const live = useRef<Live>({ think: 0, assemble: 0, pulse: 0, level: 0, spin: 0, warm: 1 });
   const mobile = typeof window !== "undefined" && window.innerWidth < 768;
   const shell = useMemo(() => buildShell(mobile ? 2200 : 4500), [mobile]);
   const dust = useMemo(() => buildDust(mobile ? 300 : 700), [mobile]);
+  const wire = useMemo(() => new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(1.2, 2)), []);
   const uniforms = useMemo(() => ({
     uTime: { value: 0 }, uLevel: { value: 0 }, uThink: { value: 0 }, uAssemble: { value: 0 },
-    uPulse: { value: 0 }, uSpin: { value: 0 }, uPx: { value: 1 },
+    uPulse: { value: 0 }, uSpin: { value: 0 }, uPx: { value: 1 }, uWarm: { value: 1 },
     uCyan: { value: CYAN }, uGold: { value: GOLD },
   }), []);
   const glowU = useMemo(() => ({ uInt: { value: 1 }, uThink: { value: 0 }, uCyan: { value: CYAN }, uGold: { value: GOLD } }), []);
   const gl = useThree((s) => s.gl);
 
-  useEffect(() => () => { shell.dispose(); dust.dispose(); }, [shell, dust]);
+  useEffect(() => () => { shell.dispose(); dust.dispose(); wire.dispose(); }, [shell, dust, wire]);
   useEffect(() => {
     const g = grid.current;
     const m = g.material as THREE.LineBasicMaterial;
@@ -188,10 +189,12 @@ function Scene({ state, level, onActivate }: { state: CoreState; level: number; 
     L.level += (target - L.level) * Math.min(1, dt * 10);
     L.pulse = Math.max(0, L.pulse - dt * 1.4);
     L.spin += dt * L.think * 1.4;
+    L.warm += ((state === "listening" ? 0 : 1) - L.warm) * Math.min(1, dt * 3);
 
     uniforms.uTime.value = t; uniforms.uLevel.value = L.level; uniforms.uThink.value = L.think;
     uniforms.uAssemble.value = ease(L.assemble); uniforms.uPulse.value = L.pulse;
     uniforms.uSpin.value = L.spin; uniforms.uPx.value = s.viewport.dpr;
+    uniforms.uWarm.value = L.warm;
     glowU.uThink.value = L.think;
     glowU.uInt.value = 0.8 + L.level * 1.2 + L.pulse * 0.8 + Math.sin(t * 1.4) * 0.1;
 
@@ -219,6 +222,9 @@ function Scene({ state, level, onActivate }: { state: CoreState; level: number; 
         {ARCS.map((a, i) => <Arcs key={`a${i}`} {...a} live={live} />)}
       </group>
       <group ref={root}>
+        <lineSegments geometry={wire}>
+          <lineBasicMaterial color="#F2B84B" transparent opacity={0.16} blending={THREE.AdditiveBlending} depthWrite={false} />
+        </lineSegments>
         <points geometry={shell} frustumCulled={false}>
           <shaderMaterial vertexShader={shellVert} fragmentShader={shellFrag} uniforms={uniforms}
             transparent depthWrite={false} blending={THREE.AdditiveBlending} />
