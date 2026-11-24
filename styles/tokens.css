@@ -22,6 +22,12 @@
   --color-accent: #007AFF;
   --color-destructive: #FF3B30;
 
+  /* JARVIS Core Arc Reactor HUD tokens */
+  --cyan: #4ce6ff;
+  --cyan-band: rgba(76, 230, 255, 0.38);
+  --amber: #ffb833;
+  --font-orbitron: "Orbitron", -apple-system, BlinkMacSystemFont, sans-serif;
+
   /* ==========================================================================
      Shadows — Light
      ========================================================================== */
