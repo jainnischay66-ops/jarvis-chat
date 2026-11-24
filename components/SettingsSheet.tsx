@@ -1,14 +1,14 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import * as Dialog from '@radix-ui/react-dialog'
 import * as Slider from '@radix-ui/react-slider'
-import { motion, AnimatePresence } from 'framer-motion'
-import { X, Download, Upload, Trash2, Eye, Sliders, Layers, Volume2, VolumeX, Mic, Play, RefreshCw, Film } from 'lucide-react'
+import { Download, Upload, Trash2, Eye, Sliders, Layers, Volume2, VolumeX, Mic, Play, RefreshCw, Film } from 'lucide-react'
 import { SHORTCUTS } from '@/hooks/useKeyboardShortcuts'
 import { DEFAULT_SYSTEM_PROMPT, type UIPreferences, type Conversation } from '@/lib/storage'
 import { getTTSManager, type TTSVoice } from '@/lib/tts'
 import type { ProviderName } from '@/lib/llm/types'
+import { Overlay } from './Overlay'
+import { ConfirmDialog } from './ConfirmDialog'
 
 interface SettingsSheetProps {
   isOpen: boolean
@@ -167,45 +167,17 @@ export function SettingsSheet({
   }
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={open => !open && onClose()}>
-      <AnimatePresence>
-        {isOpen && (
-          <Dialog.Portal forceMount>
-            <Dialog.Overlay asChild>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
-              />
-            </Dialog.Overlay>
-
-            <Dialog.Content asChild>
-              <motion.div
-                initial={{ x: '100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '100%' }}
-                transition={{ type: 'spring', stiffness: 400, damping: 36 }}
-                className="holo-brackets fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-[var(--surface)] border-l border-[var(--line)] shadow-float flex flex-col focus:outline-none select-none overflow-hidden text-[var(--text)]"
-              >
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 h-14 border-b border-[var(--line)] safe-area-top">
-                  <Dialog.Title className="font-hud text-base font-semibold tracking-wider text-[var(--text)] uppercase">
-                    SYSTEM CONFIGURATION
-                  </Dialog.Title>
-                  <Dialog.Close asChild>
-                    <button
-                      aria-label="Close settings"
-                      className="w-9 h-9 rounded flex items-center justify-center text-[var(--text-2)] hover:text-[var(--cyan)] hover:bg-[var(--surface-hi)] transition-all cursor-pointer"
-                    >
-                      <X size={18} strokeWidth={1.5} />
-                    </button>
-                  </Dialog.Close>
-                </div>
-
-                {/* Body (scrollable) */}
-                <div className="flex-1 overflow-y-auto p-5 space-y-6 momentum-scroll text-xs">
+    <>
+      <Overlay
+        isOpen={isOpen}
+        onClose={onClose}
+        variant="sheet-right"
+        title="SYSTEM CONFIGURATION"
+        closeAriaLabel="Close settings"
+        errorFallbackLabel="settings"
+        panelTestId="settings-sheet"
+        bodyClassName="p-5 space-y-6 text-xs"
+      >
                   {/* DISPLAY (Replaces Appearance) */}
                   <section className="space-y-2">
                     <h3 className="font-hud text-xs font-semibold uppercase tracking-wider text-[var(--cyan-dim)] px-1">
@@ -783,41 +755,15 @@ export function SettingsSheet({
                       </button>
 
                       <div className="border-t border-[var(--line)] pt-1 mt-1">
-                        {confirmClear ? (
-                          <div className="flex items-center justify-between p-2 bg-[var(--surface)] border border-[var(--red)]">
-                            <span className="font-hud text-xs text-[var(--red)] tracking-wider">
-                              PURGE ALL DATA?
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => setConfirmClear(false)}
-                                className="font-hud px-2 py-1 text-xs text-[var(--text-2)] hover:text-[var(--text)]"
-                              >
-                                ABORT
-                              </button>
-                              <button
-                                onClick={async () => {
-                                  await onClearAllData()
-                                  setConfirmClear(false)
-                                  onClose()
-                                }}
-                                className="font-hud px-2.5 py-1 text-xs bg-[var(--red)] text-white hover:opacity-90 font-medium tracking-wider"
-                              >
-                                CONFIRM PURGE
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmClear(true)}
-                            className="w-full flex items-center justify-between px-3 py-2 text-[var(--red)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
-                          >
-                            <span className="flex items-center gap-2 font-hud tracking-wider">
-                              <Trash2 size={14} strokeWidth={1.5} />
-                              PURGE ALL ARCHIVES & PREFERENCES
-                            </span>
-                          </button>
-                        )}
+                        <button
+                          onClick={() => setConfirmClear(true)}
+                          className="w-full flex items-center justify-between px-3 py-2 text-[var(--red)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
+                        >
+                          <span className="flex items-center gap-2 font-hud tracking-wider">
+                            <Trash2 size={14} strokeWidth={1.5} />
+                            PURGE ALL ARCHIVES & PREFERENCES
+                          </span>
+                        </button>
                       </div>
                     </div>
                   </section>
@@ -841,12 +787,22 @@ export function SettingsSheet({
                       ))}
                     </div>
                   </section>
-                </div>
-              </motion.div>
-            </Dialog.Content>
-          </Dialog.Portal>
-        )}
-      </AnimatePresence>
-    </Dialog.Root>
+      </Overlay>
+
+      <ConfirmDialog
+        isOpen={confirmClear}
+        onClose={() => setConfirmClear(false)}
+        onConfirm={async () => {
+          await onClearAllData()
+          onClose()
+        }}
+        title="PURGE ALL ARCHIVES & PREFERENCES"
+        description="This will permanently erase all saved conversations, tactical archives, and custom preferences on this device. This action cannot be undone."
+        confirmLabel="CONFIRM PURGE"
+        cancelLabel="ABORT"
+        destructive
+        panelTestId="confirm-purge-dialog"
+      />
+    </>
   )
 }
