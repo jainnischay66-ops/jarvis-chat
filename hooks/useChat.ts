@@ -8,7 +8,7 @@ interface UseChatProps {
   currentConversation: Conversation | null
   onUpdateConversation: (conv: Conversation) => Promise<void>
   preferences: UIPreferences
-  onAutoTitle?: (firstUserMessage: string) => void
+  onAutoTitle?: (conversationId: string, firstUserMessage: string) => void
 }
 
 export function useChat({
@@ -136,7 +136,7 @@ export function useChat({
           (!activeConversation.title || activeConversation.title === 'New conversation') &&
           onAutoTitle
         ) {
-          onAutoTitle(messagesToSend[0].content)
+          onAutoTitle(finalConversation.id, messagesToSend[0].content)
         }
       } catch (err: unknown) {
         if (err instanceof Error && err.name === 'AbortError') {

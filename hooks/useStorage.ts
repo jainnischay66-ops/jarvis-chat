@@ -69,14 +69,14 @@ export function useStorage() {
 
   const selectConversation = useCallback(
     async (id: string) => {
-      const found = conversations.find(c => c.id === id)
-      if (found) {
-        setCurrentConversation(found)
+      const loaded = await storage.getConversation(id)
+      if (loaded) {
+        setCurrentConversation(loaded)
         saveUIPreferences({ lastConversationId: id })
       } else {
-        const loaded = await storage.getConversation(id)
-        if (loaded) {
-          setCurrentConversation(loaded)
+        const found = conversations.find(c => c.id === id)
+        if (found) {
+          setCurrentConversation(found)
           saveUIPreferences({ lastConversationId: id })
         }
       }
@@ -111,7 +111,7 @@ export function useStorage() {
           return b.updatedAt - a.updatedAt
         })
       })
-      setCurrentConversation(updated)
+      setCurrentConversation(curr => (!curr || curr.id === updated.id ? updated : curr))
     },
     [storage]
   )
@@ -162,22 +162,42 @@ export function useStorage() {
 
   const renameConversation = useCallback(
     async (id: string, title: string) => {
-      const conv = conversations.find(c => c.id === id)
-      if (!conv) return
-      const updated = { ...conv, title: title.trim() || 'Untitled' }
-      await updateConversation(updated)
+      const trimmedTitle = title.trim() || 'Untitled'
+      const existing = await storage.getConversation(id)
+      if (existing) {
+        const updated = { ...existing, title: trimmedTitle }
+        await storage.saveConversation(updated)
+      }
+      setConversations(prev =>
+        prev.map(c => (c.id === id ? { ...c, title: trimmedTitle } : c))
+      )
+      setCurrentConversation(curr =>
+        curr?.id === id ? { ...curr, title: trimmedTitle } : curr
+      )
     },
-    [conversations, updateConversation]
+    [storage]
   )
 
   const pinConversation = useCallback(
     async (id: string) => {
-      const conv = conversations.find(c => c.id === id)
-      if (!conv) return
-      const updated = { ...conv, pinned: !conv.pinned }
-      await updateConversation(updated)
+      const existing = await storage.getConversation(id)
+      if (!existing) return
+      const nextPinned = !existing.pinned
+      const updated = { ...existing, pinned: nextPinned }
+      await storage.saveConversation(updated)
+      setConversations(prev => {
+        const updatedList = prev.map(c => (c.id === id ? { ...c, pinned: nextPinned } : c))
+        return [...updatedList].sort((a, b) => {
+          if (a.pinned && !b.pinned) return -1
+          if (!a.pinned && b.pinned) return 1
+          return b.updatedAt - a.updatedAt
+        })
+      })
+      setCurrentConversation(curr =>
+        curr?.id === id ? { ...curr, pinned: nextPinned } : curr
+      )
     },
-    [conversations, updateConversation]
+    [storage]
   )
 
   const updatePreferences = useCallback((newPrefs: Partial<UIPreferences>) => {

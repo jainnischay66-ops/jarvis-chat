@@ -53,9 +53,7 @@ export default function ChatWindow() {
 
   // Auto-generate title after the first exchange
   const handleAutoTitle = useCallback(
-    async (firstUserMessage: string) => {
-      if (!currentConversation) return
-
+    async (conversationId: string, firstUserMessage: string) => {
       try {
         const res = await fetch('/api/chat', {
           method: 'POST',
@@ -78,7 +76,7 @@ export default function ChatWindow() {
         if (res.ok) {
           const data = await res.json()
           if (data.title) {
-            renameConversation(currentConversation.id, data.title)
+            await renameConversation(conversationId, data.title)
             return
           }
         }
@@ -88,9 +86,9 @@ export default function ChatWindow() {
 
       // Fallback: first 30 chars of the message
       const fallback = firstUserMessage.slice(0, 30).trim()
-      renameConversation(currentConversation.id, fallback)
+      await renameConversation(conversationId, fallback)
     },
-    [currentConversation, preferences, renameConversation]
+    [preferences.provider, preferences.model, renameConversation]
   )
 
   // Chat hook
