@@ -51,7 +51,7 @@ export const Message = memo(function Message({
               {message.attachments.map(att => (
                 <div
                   key={att.id}
-                  className="holo overflow-hidden border border-[var(--cyan)] max-w-[200px]"
+                  className="overflow-hidden border border-[var(--line)] max-w-[200px]"
                 >
                   {att.type === 'image' && att.preview ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -70,8 +70,8 @@ export const Message = memo(function Message({
             </div>
           )}
 
-          {/* User Holo Bubble */}
-          <div className="holo px-4 py-3 bg-[var(--cyan-faint)] border border-[var(--cyan)] text-[var(--text)] select-text shadow-[0_0_12px_rgba(92,203,245,0.15)] message-user">
+          {/* User Bubble: chamfered with corner brackets, no scanlines, no border glow */}
+          <div className="chamfer-card holo-brackets px-4 py-3 bg-[var(--cyan-faint)] border border-[var(--cyan)] text-[var(--text)] select-text">
             <p className="font-body-inter whitespace-pre-wrap break-words text-[var(--text)]">
               {message.content}
             </p>

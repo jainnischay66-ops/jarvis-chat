@@ -16,7 +16,7 @@ interface MessageListProps {
   onReadAloud: (content: string) => void
   isReading: boolean
   onSuggestionClick: (prompt: string) => void
-  scrollContainerRef: RefObject<HTMLDivElement | null>
+  scrollContainerRef?: RefObject<HTMLDivElement | null>
   state?: CoreState
   level?: number
 }
@@ -31,7 +31,6 @@ export function MessageList({
   onReadAloud,
   isReading,
   onSuggestionClick,
-  scrollContainerRef,
   state = 'idle',
   level = 0,
 }: MessageListProps) {
@@ -46,41 +45,36 @@ export function MessageList({
   }
 
   return (
-    <div
-      ref={scrollContainerRef}
-      className="flex-1 w-full overflow-y-auto px-4 pt-8 pb-36 momentum-scroll z-10"
-    >
-      <div className="max-w-[720px] mx-auto w-full flex flex-col justify-end min-h-full">
-        {messages.map((message, idx) => (
-          <Message
-            key={message.id}
-            message={message}
-            onCopy={onCopy}
-            onRegenerate={onRegenerate}
-            onEdit={onEdit}
-            onReadAloud={onReadAloud}
-            isReading={isReading}
-            isLatest={idx === messages.length - 1}
-          />
-        ))}
+    <div className="w-full flex flex-col justify-start min-h-full py-4 space-y-4">
+      {messages.map((message, idx) => (
+        <Message
+          key={message.id}
+          message={message}
+          onCopy={onCopy}
+          onRegenerate={onRegenerate}
+          onEdit={onEdit}
+          onReadAloud={onReadAloud}
+          isReading={isReading}
+          isLatest={idx === messages.length - 1}
+        />
+      ))}
 
-        {/* Live streaming message container if assistant is currently generating */}
-        {isStreaming && (
-          <Message
-            key="streaming-live"
-            message={{
-              id: 'streaming-live',
-              role: 'assistant',
-              content: streamingContent,
-              createdAt: Date.now(),
-            }}
-            isStreaming={true}
-            streamingContent={streamingContent}
-            onCopy={onCopy}
-            isLatest={true}
-          />
-        )}
-      </div>
+      {/* Live streaming message container if assistant is currently generating */}
+      {isStreaming && (
+        <Message
+          key="streaming-live"
+          message={{
+            id: 'streaming-live',
+            role: 'assistant',
+            content: streamingContent,
+            createdAt: Date.now(),
+          }}
+          isStreaming={true}
+          streamingContent={streamingContent}
+          onCopy={onCopy}
+          isLatest={true}
+        />
+      )}
     </div>
   )
 }

@@ -27,6 +27,13 @@ export default function ChatWindow() {
 
   const [hasScrolled, setHasScrolled] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  // On mobile screens, start with sidebar closed so chat is immediately visible
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setSidebarOpen(false)
+    }
+  }, [])
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isPaletteOpen, setIsPaletteOpen] = useState(false)
   const [configStatus, setConfigStatus] = useState<ConfigStatus | null>(null)
@@ -85,7 +92,6 @@ export default function ChatWindow() {
         console.warn('Failed to auto-generate title:', e)
       }
 
-      // Fallback: first 30 chars of the message
       const fallback = firstUserMessage.slice(0, 30).trim()
       await renameConversation(conversationId, fallback)
     },
@@ -142,7 +148,6 @@ export default function ChatWindow() {
       lastCharCountRef.current = currentChars
       lastTokenTimeRef.current = now
 
-      // Approx 4 chars per token
       const tokensPerSecond = (deltaChars / 4) / dt
       const targetLevel = Math.min(1, Math.max(0, tokensPerSecond / 40))
 
@@ -179,7 +184,6 @@ export default function ChatWindow() {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const { showScrollButton, scrollToBottom } = useScrollAnchor(scrollContainerRef)
 
-  // Check scroll position for TopBar styling
   useEffect(() => {
     const el = scrollContainerRef.current
     if (!el) return
@@ -192,7 +196,6 @@ export default function ChatWindow() {
     return () => el.removeEventListener('scroll', handleScroll)
   }, [currentConversation])
 
-  // Delete conversation with toast undo
   const handleDeleteConversation = useCallback(
     async (id: string) => {
       const conv = conversations.find(c => c.id === id)
@@ -212,7 +215,6 @@ export default function ChatWindow() {
     [conversations, deleteConversation, undoDelete, toast]
   )
 
-  // Keyboard shortcuts
   useKeyboardShortcuts({
     onNewChat: () => createConversation(),
     onToggleSidebar: () => setSidebarOpen(prev => !prev),
@@ -264,14 +266,18 @@ export default function ChatWindow() {
   }
 
   const grouped = getGroupedConversations()
-  const currentTitle = currentConversation?.title || 'NEW PROTOCOL'
+  const currentTitle = currentConversation?.title || 'NEW CONVERSATION'
   const modelName = preferences.model || configStatus?.model || 'gemini-2.0-flash'
   const hasMessages = Boolean(
     (currentConversation?.messages && currentConversation.messages.length > 0) || isStreaming
   )
 
   return (
-    <div className="flex h-[100dvh] w-full bg-[var(--bg)] text-[var(--text)] overflow-hidden relative">
+    <div
+      className={`app h-[100dvh] w-full bg-[var(--bg)] text-[var(--text)] overflow-hidden relative ${
+        sidebarOpen ? '' : 'sidebar-closed'
+      }`}
+    >
       {/* Faint HUD backdrop: fixed full-screen CSS grid (60px cells, cyan at 4% opacity) with radial vignette */}
       <div className="hud-grid-backdrop pointer-events-none" />
 
@@ -282,7 +288,7 @@ export default function ChatWindow() {
         </div>
       )}
 
-      {/* Left Sidebar */}
+      {/* Left Sidebar (col 1 of .app grid) */}
       <Sidebar
         isOpen={sidebarOpen}
         groupedConversations={grouped}
@@ -295,9 +301,9 @@ export default function ChatWindow() {
         onDelete={handleDeleteConversation}
       />
 
-      {/* Main Chat Area */}
-      <main className="flex-1 flex flex-col h-full relative min-w-0 overflow-hidden z-10">
-        {/* Top Bar */}
+      {/* Main Chat Area (col 2 of .app grid): 3 rows: TopBar (56px), Scroll (minmax(0, 1fr)), Composer (auto) */}
+      <main className="main h-full min-h-0 min-w-0 relative z-10 overflow-hidden">
+        {/* Row 1: Top Bar (56px) */}
         <TopBar
           title={currentTitle}
           modelName={modelName}
@@ -315,71 +321,83 @@ export default function ChatWindow() {
           coreState={coreState}
         />
 
-        {/* Inline error banner if any */}
-        {chatError && (
-          <div className="mx-auto max-w-[720px] w-full px-4 pt-2 z-20">
-            <div className="holo flex items-center justify-between px-3 py-2 bg-[var(--surface-hi)] border border-[var(--red)] text-xs font-mono text-[var(--red)]">
-              <span>{chatError}</span>
-              <button
-                onClick={retry}
-                className="underline hover:opacity-80 font-hud uppercase tracking-wider ml-2 cursor-pointer"
-              >
-                RETRY
-              </button>
+        {/* Row 2: Scroll area */}
+        <div ref={scrollContainerRef} className="scroll overflow-y-auto min-h-0 w-full relative">
+          {/* Inline error banner if any */}
+          {chatError && (
+            <div className="column w-full max-w-[760px] mx-auto px-4 pt-2 z-20">
+              <div className="chamfer-card flex items-center justify-between px-3 py-2 bg-[var(--surface-hi)] border border-[var(--red)] text-xs font-mono text-[var(--red)]">
+                <span>{chatError}</span>
+                <button
+                  onClick={retry}
+                  className="underline hover:opacity-80 font-hud uppercase tracking-wider ml-2 cursor-pointer"
+                >
+                  RETRY
+                </button>
+              </div>
             </div>
+          )}
+
+          <div
+            className={`column w-full max-w-[760px] mx-auto px-4 min-h-full flex flex-col ${
+              hasMessages ? 'justify-start' : 'justify-center'
+            }`}
+          >
+            <MessageList
+              messages={currentConversation?.messages || []}
+              streamingContent={streamingContent}
+              isStreaming={isStreaming}
+              onCopy={handleCopy}
+              onRegenerate={regenerate}
+              onEdit={(id, content) => setEditingMessage({ id, content })}
+              onReadAloud={content => {
+                if (isSpeaking) {
+                  stopSpeaking()
+                } else {
+                  speak(content)
+                }
+              }}
+              isReading={isSpeaking}
+              onSuggestionClick={prompt => sendMessage(prompt)}
+              scrollContainerRef={scrollContainerRef}
+              state={coreState}
+              level={coreLevel}
+            />
           </div>
-        )}
 
-        {/* Message List */}
-        <MessageList
-          messages={currentConversation?.messages || []}
-          streamingContent={streamingContent}
-          isStreaming={isStreaming}
-          onCopy={handleCopy}
-          onRegenerate={regenerate}
-          onEdit={(id, content) => setEditingMessage({ id, content })}
-          onReadAloud={content => {
-            if (isSpeaking) {
-              stopSpeaking()
-            } else {
-              speak(content)
-            }
-          }}
-          isReading={isSpeaking}
-          onSuggestionClick={prompt => sendMessage(prompt)}
-          scrollContainerRef={scrollContainerRef}
-          state={coreState}
-          level={coreLevel}
-        />
+          {/* Scroll to Bottom Button */}
+          <ScrollToBottom
+            visible={showScrollButton}
+            onClick={() => scrollToBottom('smooth')}
+          />
+        </div>
 
-        {/* Scroll to Bottom Button */}
-        <ScrollToBottom
-          visible={showScrollButton}
-          onClick={() => scrollToBottom('smooth')}
-        />
-
-        {/* Composer */}
-        <Composer
-          onSend={(content, attachments) => sendMessage(content, attachments)}
-          onStop={stopStreaming}
-          isStreaming={isStreaming}
-          editingMessage={editingMessage}
-          onCancelEdit={() => setEditingMessage(null)}
-          onSaveEdit={(id, content) => {
-            editAndResend(id, content)
-            setEditingMessage(null)
-          }}
-          draft={currentConversation?.draft || ''}
-          onDraftChange={draft => {
-            if (currentConversation) {
-              saveDraft(currentConversation.id, draft)
-            }
-          }}
-          voiceSupported={voiceSupported}
-          onVoiceStart={handleVoiceStart}
-          isListening={isListening}
-          keyboardHeight={keyboardHeight}
-        />
+        {/* Row 3: Composer wrapper in flow (NOT fixed or absolute) */}
+        <div className="composer-wrap w-full">
+          <div className="column w-full max-w-[760px] mx-auto px-0">
+            <Composer
+              onSend={(content, attachments) => sendMessage(content, attachments)}
+              onStop={stopStreaming}
+              isStreaming={isStreaming}
+              editingMessage={editingMessage}
+              onCancelEdit={() => setEditingMessage(null)}
+              onSaveEdit={(id, content) => {
+                editAndResend(id, content)
+                setEditingMessage(null)
+              }}
+              draft={currentConversation?.draft || ''}
+              onDraftChange={draft => {
+                if (currentConversation) {
+                  saveDraft(currentConversation.id, draft)
+                }
+              }}
+              voiceSupported={voiceSupported}
+              onVoiceStart={handleVoiceStart}
+              isListening={isListening}
+              keyboardHeight={keyboardHeight}
+            />
+          </div>
+        </div>
 
         {/* Settings Sheet */}
         <SettingsSheet

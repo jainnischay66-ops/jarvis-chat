@@ -32,7 +32,6 @@ export function Composer({
   voiceSupported,
   onVoiceStart,
   isListening,
-  keyboardHeight = 0,
 }: ComposerProps) {
   const [text, setText] = useState(draft)
   const [attachments, setAttachments] = useState<StoredAttachment[]>([])
@@ -40,7 +39,6 @@ export function Composer({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Sync draft or editing content
   useEffect(() => {
     if (editingMessage) {
       setText(editingMessage.content)
@@ -50,7 +48,7 @@ export function Composer({
     }
   }, [editingMessage, draft])
 
-  // Auto-grow textarea up to 8 lines
+  // Auto-grow textarea up to 8 lines (approx 200px)
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current
     if (!el) return
@@ -173,185 +171,166 @@ export function Composer({
   }
 
   const hasContent = Boolean(text.trim() || attachments.length > 0)
-
-  // Mono status line above composer: "LISTENING", "THINKING", "READY"
-  const statusLabel = isListening
-    ? 'LISTENING'
-    : isStreaming
-    ? 'THINKING'
-    : 'READY'
+  const isReady = !isListening && !isStreaming
 
   return (
-    <div
-      style={{
-        bottom: `${Math.max(16, keyboardHeight + 16)}px`,
-      }}
-      className="fixed left-0 right-0 z-20 px-4 pointer-events-none transition-[bottom] duration-100 ease-out"
-    >
-      <div className="max-w-[720px] mx-auto pointer-events-auto">
-        {/* Status Line above composer */}
-        <div className="flex items-center justify-between px-2 pb-1.5 font-mono text-[11px] tracking-widest uppercase select-none">
-          <div className="flex items-center gap-1.5">
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                isListening
-                  ? 'bg-[var(--cyan)] shadow-[var(--glow-cyan)] animate-pulse'
-                  : isStreaming
-                  ? 'bg-[var(--gold)] shadow-[var(--glow-gold)] animate-pulse'
-                  : 'bg-[var(--cyan-dim)]'
-              }`}
-            />
-            <span
-              className={
-                isListening
-                  ? 'text-[var(--cyan)]'
-                  : isStreaming
-                  ? 'text-[var(--gold)]'
-                  : 'text-[var(--text-3)]'
-              }
-            >
-              {statusLabel}
-            </span>
-          </div>
-          <span className="text-[var(--text-3)] text-[10px]">PROTOCOL MK-VII</span>
+    <div className="w-full flex flex-col">
+      {/* Status line: appears only when state is not ready, 8px (mb-2) above composer */}
+      {!isReady && (
+        <div className="flex items-center gap-1.5 px-2 mb-2 font-mono text-[11px] tracking-widest uppercase select-none">
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              isListening ? 'bg-[var(--cyan)] animate-pulse' : 'bg-[var(--gold)] animate-pulse'
+            }`}
+          />
+          <span className={isListening ? 'text-[var(--cyan)]' : 'text-[var(--gold)]'}>
+            {isListening ? 'LISTENING' : 'THINKING'}
+          </span>
         </div>
+      )}
 
-        {/* Drag and drop overlay */}
-        {isDragging && (
-          <div className="holo mb-2 p-6 flex items-center justify-center font-hud text-sm tracking-wider text-[var(--cyan)] select-none">
-            DROP ARCHIVES TO TRANSMIT
+      {/* Drag & drop overlay */}
+      {isDragging && (
+        <div className="mb-2 p-6 flex items-center justify-center font-hud text-sm tracking-wider text-[var(--cyan)] select-none border border-[var(--cyan)] bg-[var(--surface)]">
+          DROP ARCHIVES TO TRANSMIT
+        </div>
+      )}
+
+      {/* Composer container: one bracket set, scanlines, min-h-[56px] */}
+      <div
+        onDragOver={e => {
+          e.preventDefault()
+          setIsDragging(true)
+        }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={e => {
+          e.preventDefault()
+          setIsDragging(false)
+          handleFileSelect(e.dataTransfer.files)
+        }}
+        className="chamfer-card holo-brackets holo-scanlines min-h-[56px] p-2 bg-[var(--surface)] border border-[var(--line)] flex flex-col justify-center"
+      >
+        {/* Editing Banner */}
+        {editingMessage && (
+          <div className="flex items-center justify-between px-2 pb-2 mb-1 border-b border-[var(--line)] font-mono text-xs text-[var(--text-2)]">
+            <span>EDITING MESSAGE DIRECTIVE</span>
+            <button
+              onClick={onCancelEdit}
+              className="text-[var(--cyan)] hover:underline uppercase tracking-wider"
+            >
+              Cancel
+            </button>
           </div>
         )}
 
-        {/* Chamfered .holo Composer Bar */}
-        <div
-          onDragOver={e => {
-            e.preventDefault()
-            setIsDragging(true)
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={e => {
-            e.preventDefault()
-            setIsDragging(false)
-            handleFileSelect(e.dataTransfer.files)
-          }}
-          className="holo holo-chrome relative bg-[var(--surface)] border border-[var(--line)] p-2.5 transition-all shadow-float"
-        >
-          {/* Editing Banner */}
-          {editingMessage && (
-            <div className="flex items-center justify-between px-2 pb-2 mb-1 border-b border-[var(--line)] font-mono text-xs text-[var(--text-2)]">
-              <span>EDITING MESSAGE DIRECTIVE</span>
-              <button
-                onClick={onCancelEdit}
-                className="text-[var(--cyan)] hover:underline uppercase tracking-wider"
+        {/* Attachment Chips */}
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-2 pb-2 mb-1 border-b border-[var(--line)]">
+            {attachments.map(att => (
+              <div
+                key={att.id}
+                className="flex items-center gap-1.5 px-2.5 py-1 bg-[var(--surface-hi)] border border-[var(--line)] text-xs text-[var(--text)] select-none"
               >
-                Cancel
-              </button>
-            </div>
-          )}
-
-          {/* Attachment Chips */}
-          {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-2 pb-2 mb-1 border-b border-[var(--line)]">
-              {attachments.map(att => (
-                <div
-                  key={att.id}
-                  className="holo flex items-center gap-1.5 px-2.5 py-1 bg-[var(--surface-hi)] border border-[var(--line)] text-xs text-[var(--text)] select-none"
+                <span className="truncate max-w-[140px] font-mono text-[11px]">{att.name}</span>
+                <button
+                  onClick={() => removeAttachment(att.id)}
+                  className="text-[var(--text-3)] hover:text-[var(--cyan)] ml-1"
                 >
-                  <span className="truncate max-w-[140px] font-mono text-[11px]">{att.name}</span>
-                  <button
-                    onClick={() => removeAttachment(att.id)}
-                    className="text-[var(--text-3)] hover:text-[var(--cyan)] ml-1"
-                  >
-                    <X size={12} strokeWidth={2} />
-                  </button>
-                </div>
-              ))}
-            </div>
+                  <X size={12} strokeWidth={2} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-end gap-2 px-1">
+          {/* Attach button: 18px icon in 44px hit area */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,text/*,application/pdf"
+            className="hidden"
+            onChange={e => handleFileSelect(e.target.files)}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isStreaming}
+            aria-label="Attach file or image"
+            title="Attach"
+            className="w-11 h-11 flex items-center justify-center text-[var(--text-2)] hover:text-[var(--cyan)] hover:bg-[var(--surface-hi)] active:scale-95 disabled:opacity-30 transition-all flex-shrink-0 cursor-pointer"
+          >
+            <Paperclip size={18} strokeWidth={1.5} />
+          </button>
+
+          {/* Textarea: 16px font, grows to 8 lines */}
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={handleTextChange}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            placeholder="Message J.A.R.V.I.S."
+            rows={1}
+            className="flex-1 bg-transparent font-sans text-body text-[var(--text)] placeholder-[var(--text-3)] resize-none outline-none py-2 max-h-[200px] overflow-y-auto leading-relaxed"
+          />
+
+          {/* Voice button: 18px icon in 44px hit area */}
+          {voiceSupported && !isStreaming && (
+            <button
+              onClick={onVoiceStart}
+              aria-label={isListening ? 'Listening...' : 'Voice input'}
+              title="Voice input"
+              className={`w-11 h-11 flex items-center justify-center text-[var(--text-2)] hover:text-[var(--cyan)] hover:bg-[var(--surface-hi)] active:scale-95 transition-all flex-shrink-0 cursor-pointer ${
+                isListening ? 'text-[var(--cyan)] animate-pulse' : ''
+              }`}
+            >
+              <Mic size={18} strokeWidth={1.5} />
+            </button>
           )}
 
-          <div className="flex items-end gap-2 px-1">
-            {/* Attach button */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,text/*,application/pdf"
-              className="hidden"
-              onChange={e => handleFileSelect(e.target.files)}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isStreaming}
-              aria-label="Attach file or image"
-              title="Attach"
-              className="w-11 h-11 flex items-center justify-center text-[var(--text-2)] hover:text-[var(--cyan)] hover:bg-[var(--surface-hi)] active:scale-95 disabled:opacity-30 transition-all flex-shrink-0 cursor-pointer"
-            >
-              <Paperclip size={18} strokeWidth={1.5} />
-            </button>
-
-            {/* Input textarea */}
-            <textarea
-              ref={textareaRef}
-              value={text}
-              onChange={handleTextChange}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              placeholder="Message J.A.R.V.I.S."
-              rows={1}
-              className="flex-1 bg-transparent font-sans text-body text-[var(--text)] placeholder-[var(--text-3)] resize-none outline-none py-2 max-h-[200px] overflow-y-auto leading-relaxed"
-            />
-
-            {/* Voice button */}
-            {voiceSupported && !isStreaming && (
-              <button
-                onClick={onVoiceStart}
-                aria-label={isListening ? 'Listening...' : 'Voice input'}
-                title="Voice input"
-                className={`w-11 h-11 flex items-center justify-center text-[var(--text-2)] hover:text-[var(--cyan)] hover:bg-[var(--surface-hi)] active:scale-95 transition-all flex-shrink-0 cursor-pointer ${
-                  isListening ? 'text-[var(--cyan)] shadow-[var(--glow-cyan)] animate-pulse' : ''
-                }`}
-              >
-                <Mic size={18} strokeWidth={1.5} />
-              </button>
-            )}
-
-            {/* 44px circular reactor send button */}
-            <button
-              onClick={handleAction}
-              disabled={!isStreaming && !hasContent}
-              aria-label={isStreaming ? 'Stop generating' : 'Send message'}
-              title={isStreaming ? 'Stop (Esc)' : 'Send (Enter)'}
-              className={`relative w-11 h-11 flex items-center justify-center flex-shrink-0 transition-transform active:scale-95 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed group`}
+          {/* Send reactor button: 40px reactor in 44px hit area */}
+          <button
+            onClick={handleAction}
+            disabled={!isStreaming && !hasContent}
+            aria-label={isStreaming ? 'Stop generating' : 'Send message'}
+            title={isStreaming ? 'Stop (Esc)' : 'Send (Enter)'}
+            className="relative w-11 h-11 flex items-center justify-center flex-shrink-0 transition-transform active:scale-95 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed group"
+          >
+            <div
+              className="w-10 h-10 flex items-center justify-center relative"
+              style={{
+                filter: isStreaming ? 'none' : hasContent ? 'drop-shadow(var(--glow-cyan))' : 'none',
+              }}
             >
               {/* Concentric rings */}
               <svg
-                viewBox="0 0 44 44"
+                viewBox="0 0 40 40"
                 className={`absolute inset-0 w-full h-full pointer-events-none ${
                   isStreaming ? 'text-[var(--red)]' : 'text-[var(--cyan)]'
                 }`}
               >
                 {/* Outer ring */}
                 <circle
-                  cx="22"
-                  cy="22"
-                  r="20"
+                  cx="20"
+                  cy="20"
+                  r="18"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="1.5"
-                  strokeDasharray={isStreaming ? '18 6 12 6' : '36 6 12 6'}
+                  strokeDasharray={isStreaming ? '16 6 10 6' : '32 6 10 6'}
                   className={isStreaming ? 'reactor-spin-fast' : 'group-hover:opacity-100'}
                   opacity={isStreaming ? '1' : hasContent ? '0.9' : '0.4'}
                 />
                 {/* Inner ring */}
                 <circle
-                  cx="22"
-                  cy="22"
-                  r="14"
+                  cx="20"
+                  cy="20"
+                  r="12"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="1.2"
-                  strokeDasharray="10 4"
+                  strokeDasharray="8 4"
                   opacity={isStreaming ? '1' : hasContent ? '0.8' : '0.3'}
                 />
               </svg>
@@ -364,14 +343,12 @@ export function Composer({
                   size={16}
                   strokeWidth={2}
                   className={`relative z-10 transition-colors ${
-                    hasContent
-                      ? 'text-[var(--cyan)] filter drop-shadow-[0_0_6px_var(--cyan)]'
-                      : 'text-[var(--text-3)]'
+                    hasContent ? 'text-[var(--cyan)]' : 'text-[var(--text-3)]'
                   }`}
                 />
               )}
-            </button>
-          </div>
+            </div>
+          </button>
         </div>
       </div>
     </div>

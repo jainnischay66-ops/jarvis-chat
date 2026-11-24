@@ -9,7 +9,7 @@ import JarvisCore from './JarvisCore'
 
 const JarvisOrb = dynamic(() => import('./JarvisOrb'), {
   ssr: false,
-  loading: () => <JarvisCore size={440} state="idle" />,
+  loading: () => <JarvisCore size={300} state="idle" />,
 })
 
 interface EmptyStateProps {
@@ -43,59 +43,66 @@ export function EmptyState({ onSuggestionClick, state = 'idle', level = 0 }: Emp
   const greeting = `${baseGreeting}, sir.`
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 text-center select-none relative z-10 w-full overflow-hidden min-h-full">
-      {/* Orb container with shared layoutId for smooth shrink into TopBar ArcReactor */}
+    <div className="flex flex-col items-center justify-center gap-4 py-4 w-full select-none">
+      {/* Orb stage: fades into page via radial-gradient mask */}
       <motion.div
         layoutId="jarvis-orb-reactor"
         transition={{ type: 'spring', stiffness: 220, damping: 26 }}
-        className="relative w-[340px] h-[340px] sm:w-[440px] sm:h-[440px] flex items-center justify-center my-[-25px] z-0"
+        className="relative flex items-center justify-center shrink-0"
+        style={{
+          height: 'clamp(180px, 36dvh, 340px)',
+          aspectRatio: '1',
+          width: 'auto',
+          maxWidth: '100%',
+          marginInline: 'auto',
+          background: 'transparent',
+          WebkitMaskImage: 'radial-gradient(closest-side, #000 62%, transparent 100%)',
+          maskImage: 'radial-gradient(closest-side, #000 62%, transparent 100%)',
+        }}
       >
         <JarvisOrb state={state} level={level} />
       </motion.div>
 
-      {/* Greeting & Status Readout */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="max-w-xl w-full flex flex-col items-center z-10 mt-2"
-      >
-        <h1 className="font-hud text-3xl sm:text-4xl font-semibold tracking-wider text-[var(--text)] mb-1 uppercase">
+      {/* Greeting: sits BELOW orb stage with 16px gap, never overlaps */}
+      <div className="flex flex-col items-center gap-2 w-full text-center">
+        <h1
+          style={{
+            fontFamily: 'var(--font-rajdhani), sans-serif',
+            fontWeight: 600,
+            fontSize: 'clamp(24px, 3vw, 36px)',
+            letterSpacing: '0.04em',
+          }}
+          className="text-[var(--text)] uppercase text-center m-0 leading-none"
+        >
           {greeting}
         </h1>
-        <div className="font-mono text-xs sm:text-sm text-[var(--cyan-dim)] tracking-widest uppercase mb-8 flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--cyan)] shadow-[var(--glow-cyan)] animate-pulse" />
-          <span>SYSTEMS ONLINE · {clock}</span>
-        </div>
 
-        {/* 4 .holo suggestion chips with 60ms stagger using clip-path reveal from center line */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl text-left">
-          {SUGGESTIONS.map((suggestion, idx) => (
-            <motion.button
-              key={suggestion}
-              initial={{ clipPath: 'inset(50% 0 50% 0)', opacity: 0 }}
-              animate={{ clipPath: 'inset(0% 0 0% 0)', opacity: 1 }}
-              transition={{
-                delay: 0.25 + idx * 0.06,
-                duration: 0.45,
-                ease: [0.16, 1, 0.3, 1],
-              }}
-              onClick={() => onSuggestionClick(suggestion)}
-              className="holo p-4 flex flex-col justify-between min-h-[58px] bg-[var(--surface)] hover:bg-[var(--surface-hi)] border border-[var(--line)] hover:border-[var(--cyan)] active:scale-[0.98] transition-all group cursor-pointer"
-            >
-              <div className="flex items-center justify-between w-full mb-1">
-                <span className="font-hud text-[11px] text-[var(--cyan-dim)] group-hover:text-[var(--cyan)] tracking-wider">
-                  DIRECTIVE 0{idx + 1}
-                </span>
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--cyan)] opacity-60 group-hover:opacity-100 group-hover:shadow-[var(--glow-cyan)]" />
-              </div>
-              <span className="font-sans text-sm text-[var(--text)] group-hover:text-white transition-colors leading-snug">
-                {suggestion}
-              </span>
-            </motion.button>
-          ))}
+        {/* Readout line: 12px mono, text-3, one line */}
+        <div className="font-mono text-[12px] text-[var(--text-3)] text-center tracking-wider truncate">
+          SYSTEMS ONLINE · {clock}
         </div>
-      </motion.div>
+      </div>
+
+      {/* Suggestions: 2 columns, gap 12, width 100%, chamfer 10px, no brackets, no label, no dot */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-[760px] mt-2">
+        {SUGGESTIONS.map((suggestion, idx) => (
+          <button
+            key={suggestion}
+            onClick={() => onSuggestionClick(suggestion)}
+            style={{
+              clipPath:
+                'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)',
+            }}
+            className={`suggestion-chip min-h-[52px] px-4 py-3 bg-[var(--surface)] hover:bg-[var(--surface-hi)] border border-[var(--line)] hover:border-[var(--cyan)] active:scale-[0.98] transition-all text-left flex items-center cursor-pointer ${
+              idx >= 2 ? 'max-h-[560px]:hidden' : ''
+            }`}
+          >
+            <span className="font-sans text-[14px] leading-[1.35] text-[var(--text)] line-clamp-2">
+              {suggestion}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

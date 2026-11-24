@@ -70,7 +70,7 @@ void main(){
   p = mix(aScatter, p, uAssemble);
   vec4 mv = modelViewMatrix*vec4(p,1.);
   gl_Position = projectionMatrix*mv;
-  gl_PointSize = (1.0+aSeed*1.6+uLevel*1.2)*uPx*(11.0/-mv.z);
+  gl_PointSize = (2.5+aSeed*3.5+uLevel*2.5)*uPx*(8.2/-mv.z);
   vGlow = clamp(.6+.4*n+uLevel*.6, .2, 1.5);
   vSeed = aSeed;
 }`;
@@ -94,7 +94,7 @@ uniform float uInt, uThink; uniform vec3 uCyan, uGold; varying vec3 vN, vV;
 void main(){
   float f = pow(1.-abs(dot(normalize(vN),normalize(vV))), 2.);
   vec3 base = mix(uCyan, uGold, uThink*.7);
-  gl_FragColor = vec4(mix(base, vec3(1.), .35)*(.5+f*1.8)*uInt, .85);
+  gl_FragColor = vec4(mix(base, vec3(1.), .2)*(.3+f*1.2)*uInt, .5);
 }`;
 
 function TickRing({ radius, count, color, rot, speed, gaps, live }:
@@ -157,7 +157,7 @@ function Scene({ state, level, onActivate }: { state: CoreState; level: number; 
   const glow = useRef<THREE.Mesh>(null!);
   const live = useRef<Live>({ think: 0, assemble: 0, pulse: 0, level: 0, spin: 0, warm: 1 });
   const mobile = typeof window !== "undefined" && window.innerWidth < 768;
-  const shell = useMemo(() => buildShell(mobile ? 2200 : 4500), [mobile]);
+  const shell = useMemo(() => buildShell(mobile ? 3500 : 9000), [mobile]);
   const dust = useMemo(() => buildDust(mobile ? 300 : 700), [mobile]);
   const wire = useMemo(() => new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(1.2, 2)), []);
   const uniforms = useMemo(() => ({
@@ -210,7 +210,6 @@ function Scene({ state, level, onActivate }: { state: CoreState; level: number; 
 
   return (
     <>
-      <color attach="background" args={[BG]} />
       <fog attach="fog" args={[BG, 9, 24]} />
       <gridHelper ref={grid} args={[40, 40, "#1B4A63", "#1B4A63"]} position={[0, -2.9, 0]} />
       <points geometry={dust} frustumCulled={false}>
@@ -231,7 +230,7 @@ function Scene({ state, level, onActivate }: { state: CoreState; level: number; 
         </points>
       </group>
       <mesh ref={glow}>
-        <sphereGeometry args={[0.4, 32, 32]} />
+        <sphereGeometry args={[0.22, 32, 32]} />
         <shaderMaterial vertexShader={glowVert} fragmentShader={glowFrag} uniforms={glowU}
           transparent depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
@@ -254,22 +253,23 @@ export default function JarvisOrb({ state = "idle", level = 0, className, onActi
 
   return (
     <div className={className} aria-label={`J.A.R.V.I.S., ${state}`}
-      style={{ position: "relative", width: "100%", height: "100%", background: BG, overflow: "hidden" }}>
+      style={{ position: "relative", width: "100%", height: "100%", background: "transparent", overflow: "hidden" }}>
       <Canvas frameloop={visible ? "always" : "never"} dpr={[1, 1.75]}
         camera={{ position: [0, 0.6, 8.2], fov: 45 }}
-        gl={{ antialias: false, powerPreference: "high-performance" }}>
+        gl={{ alpha: true, antialias: false, powerPreference: "high-performance" }}>
         <Scene state={state} level={level} onActivate={onActivate} />
       </Canvas>
-      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-        <div style={{ padding: "14px 22px",
-          background: "radial-gradient(closest-side, rgba(2,4,10,0.8), rgba(2,4,10,0))",
-          color: "#EAF9FF", fontWeight: 600, fontSize: 14, letterSpacing: "0.32em",
-          textShadow: "0 0 12px rgba(92,203,245,0.9)" }}>
+      <div style={{ position: "absolute", bottom: 8, insetInline: 0, display: "flex", flexDirection: "column",
+        alignItems: "center", pointerEvents: "none" }}>
+        <div style={{ padding: "4px 14px",
+          color: "#EAF9FF", fontWeight: 600, fontSize: 13, letterSpacing: "0.25em",
+          fontFamily: "var(--font-orbitron), sans-serif",
+          textShadow: "0 0 8px rgba(92,203,245,0.6)" }}>
           J.A.R.V.I.S.
         </div>
-        <div style={{ marginTop: 2, fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase",
-          color: "rgba(92,203,245,0.7)" }}>
+        <div style={{ fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase",
+          fontFamily: "var(--font-mono), monospace",
+          color: "rgba(92,203,245,0.6)" }}>
           {state}
         </div>
       </div>

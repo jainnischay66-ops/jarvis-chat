@@ -150,7 +150,7 @@ export function SettingsSheet({
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: 'spring', stiffness: 400, damping: 36 }}
-                className="holo holo-chrome fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-[var(--surface)] border-l border-[var(--line)] shadow-float flex flex-col focus:outline-none select-none overflow-hidden text-[var(--text)]"
+                className="holo-brackets fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-[var(--surface)] border-l border-[var(--line)] shadow-float flex flex-col focus:outline-none select-none overflow-hidden text-[var(--text)]"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 h-14 border-b border-[var(--line)] safe-area-top">
@@ -174,7 +174,7 @@ export function SettingsSheet({
                     <h3 className="font-hud text-xs font-semibold uppercase tracking-wider text-[var(--cyan-dim)] px-1">
                       DISPLAY
                     </h3>
-                    <div className="holo p-3 bg-[var(--surface-hi)] border border-[var(--line)] space-y-3">
+                    <div className="p-3 bg-[var(--surface-hi)] border border-[var(--line)] space-y-3">
                       {/* Scanlines toggle */}
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
@@ -187,9 +187,9 @@ export function SettingsSheet({
                         </div>
                         <button
                           onClick={() => handleToggleScanlines(!scanlines)}
-                          className={`holo px-3 py-1 font-hud tracking-widest text-xs border transition-all ${
+                          className={`px-3 py-1 font-hud tracking-widest text-xs border transition-all ${
                             scanlines
-                              ? 'border-[var(--cyan)] text-[var(--cyan)] bg-[var(--cyan-faint)] shadow-[var(--glow-cyan)]'
+                              ? 'border-[var(--cyan)] text-[var(--cyan)] bg-[var(--cyan-faint)]'
                               : 'border-[var(--line)] text-[var(--text-3)] bg-[var(--surface)]'
                           }`}
                         >
@@ -209,9 +209,9 @@ export function SettingsSheet({
                         </div>
                         <button
                           onClick={() => handleToggleHolo(!holoEffects)}
-                          className={`holo px-3 py-1 font-hud tracking-widest text-xs border transition-all ${
+                          className={`px-3 py-1 font-hud tracking-widest text-xs border transition-all ${
                             holoEffects
-                              ? 'border-[var(--cyan)] text-[var(--cyan)] bg-[var(--cyan-faint)] shadow-[var(--glow-cyan)]'
+                              ? 'border-[var(--cyan)] text-[var(--cyan)] bg-[var(--cyan-faint)]'
                               : 'border-[var(--line)] text-[var(--text-3)] bg-[var(--surface)]'
                           }`}
                         >
@@ -241,7 +241,7 @@ export function SettingsSheet({
                     <h3 className="font-hud text-xs font-semibold uppercase tracking-wider text-[var(--cyan-dim)] px-1">
                       CORE INTELLIGENCE ENGINE
                     </h3>
-                    <div className="holo p-3.5 bg-[var(--surface-hi)] border border-[var(--line)] space-y-3.5">
+                    <div className="p-3.5 bg-[var(--surface-hi)] border border-[var(--line)] space-y-3.5">
                       {/* Provider */}
                       <div className="space-y-1.5">
                         <label className="font-hud text-xs tracking-wider text-[var(--text-2)]">
@@ -337,7 +337,7 @@ export function SettingsSheet({
                     <h3 className="font-hud text-xs font-semibold uppercase tracking-wider text-[var(--cyan-dim)] px-1">
                       CONTEXT CAPACITY
                     </h3>
-                    <div className="holo p-3.5 bg-[var(--surface-hi)] border border-[var(--line)] flex items-center justify-between">
+                    <div className="p-3.5 bg-[var(--surface-hi)] border border-[var(--line)] flex items-center justify-between">
                       <div className="space-y-0.5">
                         <div className="font-hud text-xs text-[var(--text)] tracking-wider">
                           ACTIVE CONTEXT WINDOW
@@ -365,7 +365,7 @@ export function SettingsSheet({
                     <h3 className="font-hud text-xs font-semibold uppercase tracking-wider text-[var(--cyan-dim)] px-1">
                       ARCHIVAL DATA STORAGE
                     </h3>
-                    <div className="holo p-2 bg-[var(--surface-hi)] border border-[var(--line)] space-y-1">
+                    <div className="p-2 bg-[var(--surface-hi)] border border-[var(--line)] space-y-1">
                       <button
                         onClick={handleExportJSON}
                         className="w-full flex items-center justify-between px-3 py-2 text-[var(--text)] hover:text-[var(--cyan)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
@@ -453,7 +453,7 @@ export function SettingsSheet({
                     <h3 className="font-hud text-xs font-semibold uppercase tracking-wider text-[var(--cyan-dim)] px-1">
                       TACTICAL SHORTCUTS
                     </h3>
-                    <div className="holo p-3 bg-[var(--surface-hi)] border border-[var(--line)] space-y-2">
+                    <div className="p-3 bg-[var(--surface-hi)] border border-[var(--line)] space-y-2">
                       {SHORTCUTS.map(sc => (
                         <div
                           key={sc.description}

@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useRef, useEffect, KeyboardEvent } from 'react'
-import { motion } from 'framer-motion'
 import { PanelLeft, Settings } from 'lucide-react'
 import { ArcReactor } from './ArcReactor'
 import type { CoreState } from './JarvisCore'
@@ -28,7 +27,6 @@ export function TopBar({
   onOpenSettings,
   onRenameTitle,
   isOnline = true,
-  hasMessages = false,
   coreState = 'idle',
 }: TopBarProps) {
   const [isEditing, setIsEditing] = useState(false)
@@ -65,43 +63,38 @@ export function TopBar({
     }
   }
 
+  const displayTitle = title && title !== 'NEW PROTOCOL' && title !== 'New conversation'
+    ? title
+    : 'NEW CONVERSATION'
+
   return (
     <header
-      className={`holo holo-chrome sticky top-0 z-20 flex items-center justify-between h-[54px] px-3.5 border-b border-[var(--line)] bg-[var(--surface)] transition-all duration-200 safe-area-top select-none ${
+      className={`holo-scanlines sticky top-0 z-20 flex items-center justify-between h-[56px] px-4 border-b border-[var(--line)] bg-[var(--surface)] select-none transition-shadow ${
         hasScrolled ? 'shadow-md shadow-black/40' : ''
       }`}
     >
-      {/* Left: Sidebar Toggle + ArcReactor or Wordmark */}
-      <div className="flex items-center gap-2.5">
+      {/* Left: sidebar toggle, 28px arc reactor, "J.A.R.V.I.S." in Orbitron 13px */}
+      <div className="flex items-center gap-2">
         <button
           onClick={onToggleSidebar}
           aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
           title="Toggle sidebar (⌘B)"
-          className="w-10 h-10 rounded flex items-center justify-center text-[var(--text-2)] hover:text-[var(--cyan)] hover:bg-[var(--surface-hi)] active:scale-95 transition-all"
+          className="w-11 h-11 flex items-center justify-center text-[var(--text-2)] hover:text-[var(--cyan)] hover:bg-[var(--surface-hi)] active:scale-95 transition-all cursor-pointer"
         >
           <PanelLeft size={18} strokeWidth={1.5} />
         </button>
 
-        {/* When conversation is active, the big orb shrinks into this 40px ArcReactor via shared layoutId */}
-        {hasMessages && (
-          <motion.div
-            layoutId="jarvis-orb-reactor"
-            transition={{ type: 'spring', stiffness: 220, damping: 26 }}
-            className="w-10 h-10 flex items-center justify-center shrink-0"
-          >
-            <ArcReactor state={coreState} size={36} />
-          </motion.div>
-        )}
+        <div className="w-7 h-7 flex items-center justify-center shrink-0">
+          <ArcReactor state={coreState} size={28} />
+        </div>
 
-        {!hasMessages && (
-          <span className="font-wordmark text-xs tracking-widest text-[var(--cyan)] hidden sm:inline-block">
-            J.A.R.V.I.S.
-          </span>
-        )}
+        <span className="font-wordmark text-[13px] text-[var(--cyan)] tracking-wider shrink-0 hidden sm:inline-block">
+          J.A.R.V.I.S.
+        </span>
       </div>
 
-      {/* Center: Title (Rajdhani Uppercase) + Model (Mono secondary) */}
-      <div className="flex flex-col items-center justify-center max-w-[50%] min-w-0">
+      {/* Center: title in Rajdhani 14px uppercase, tracking .12em, one line, ellipsis; model in 11px mono text-3 */}
+      <div className="flex flex-col items-center justify-center max-w-[45%] sm:max-w-[55%] min-w-0">
         {isEditing ? (
           <input
             ref={inputRef}
@@ -110,26 +103,26 @@ export function TopBar({
             onChange={e => setEditValue(e.target.value)}
             onBlur={handleSave}
             onKeyDown={handleKeyDown}
-            className="font-hud text-sm font-semibold tracking-wider text-[var(--text)] text-center bg-[var(--surface-hi)] border border-[var(--cyan)] rounded px-2 py-0.5 outline-none max-w-full uppercase"
+            className="font-hud text-[14px] font-semibold tracking-[0.12em] text-[var(--text)] text-center bg-[var(--surface-hi)] border border-[var(--cyan)] px-2 py-0.5 outline-none max-w-full uppercase"
           />
         ) : (
           <button
             onClick={() => setIsEditing(true)}
             title="Click to rename"
-            className="font-hud text-sm sm:text-base font-semibold tracking-wider text-[var(--text)] hover:text-[var(--cyan)] transition-colors truncate max-w-full cursor-text uppercase px-1 py-0.5"
+            className="font-hud text-[14px] font-semibold tracking-[0.12em] text-[var(--text)] hover:text-[var(--cyan)] transition-colors truncate max-w-full cursor-text uppercase px-1 leading-tight text-center"
           >
-            {title || 'NEW PROTOCOL'}
+            {displayTitle}
           </button>
         )}
-        <span className="font-mono text-[11px] text-[var(--text-2)] tracking-normal truncate">
+        <span className="font-mono text-[11px] text-[var(--text-3)] truncate leading-tight text-center">
           {modelName}
         </span>
       </div>
 
-      {/* Right: Status chip ("ONLINE" / "OFFLINE" with dot) + Settings button */}
+      {/* Right: ONLINE chip (11px) and settings button (44px touch target) */}
       <div className="flex items-center gap-2">
         <div
-          className={`holo px-2 py-0.5 border text-[11px] font-hud tracking-widest flex items-center gap-1.5 ${
+          className={`px-2 py-0.5 border text-[11px] font-hud tracking-widest flex items-center gap-1.5 ${
             isOnline
               ? 'border-[var(--line)] text-[var(--cyan)] bg-[var(--surface)]'
               : 'border-[var(--red)] text-[var(--red)] bg-[var(--surface)]'
@@ -137,7 +130,7 @@ export function TopBar({
         >
           <span
             className={`w-1.5 h-1.5 rounded-full ${
-              isOnline ? 'bg-[var(--cyan)] shadow-[var(--glow-cyan)]' : 'bg-[var(--red)]'
+              isOnline ? 'bg-[var(--cyan)]' : 'bg-[var(--red)]'
             }`}
           />
           <span>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
@@ -147,7 +140,7 @@ export function TopBar({
           onClick={onOpenSettings}
           aria-label="Open settings"
           title="Settings (⌘,)"
-          className="w-10 h-10 rounded flex items-center justify-center text-[var(--text-2)] hover:text-[var(--cyan)] hover:bg-[var(--surface-hi)] active:scale-95 transition-all"
+          className="w-11 h-11 flex items-center justify-center text-[var(--text-2)] hover:text-[var(--cyan)] hover:bg-[var(--surface-hi)] active:scale-95 transition-all cursor-pointer"
         >
           <Settings size={18} strokeWidth={1.5} />
         </button>
