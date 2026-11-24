@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
-import { ArrowUp, Square, Paperclip, Mic, X } from 'lucide-react'
+import { ArrowUp, Square, Paperclip, Mic, X, HelpCircle } from 'lucide-react'
 import type { StoredAttachment } from '@/lib/storage'
 import { generateId } from '@/lib/utils'
 
@@ -18,6 +18,7 @@ interface ComposerProps {
   onVoiceStart: () => void
   isListening: boolean
   keyboardHeight?: number
+  onOpenVoiceCommands?: () => void
 }
 
 export function Composer({
@@ -32,6 +33,7 @@ export function Composer({
   voiceSupported,
   onVoiceStart,
   isListening,
+  onOpenVoiceCommands,
 }: ComposerProps) {
   const [text, setText] = useState(draft)
   const [attachments, setAttachments] = useState<StoredAttachment[]>([])
@@ -291,6 +293,19 @@ export function Composer({
               }`}
             >
               <Mic size={18} strokeWidth={1.5} />
+            </button>
+          )}
+
+          {/* Voice commands info button */}
+          {onOpenVoiceCommands && (
+            <button
+              type="button"
+              onClick={onOpenVoiceCommands}
+              aria-label="Tactical voice commands"
+              title="Voice Commands Guide"
+              className="w-11 h-11 flex items-center justify-center text-[var(--text-3)] hover:text-[var(--cyan)] hover:bg-[var(--surface-hi)] active:scale-95 transition-all flex-shrink-0 cursor-pointer"
+            >
+              <HelpCircle size={17} strokeWidth={1.5} />
             </button>
           )}
 

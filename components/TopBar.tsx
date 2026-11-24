@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, KeyboardEvent } from 'react'
-import { PanelLeft, Settings } from 'lucide-react'
+import { PanelLeft, Settings, Volume2, VolumeX } from 'lucide-react'
 import { ArcReactor } from './ArcReactor'
 import type { CoreState } from './JarvisCore'
 
@@ -16,6 +16,10 @@ interface TopBarProps {
   isOnline?: boolean
   hasMessages?: boolean
   coreState?: CoreState
+  voiceEnabled?: boolean
+  onToggleVoice?: () => void
+  autoSpeak?: boolean
+  onToggleAutoSpeak?: () => void
 }
 
 export function TopBar({
@@ -28,6 +32,10 @@ export function TopBar({
   onRenameTitle,
   isOnline = true,
   coreState = 'idle',
+  voiceEnabled = true,
+  onToggleVoice,
+  autoSpeak = true,
+  onToggleAutoSpeak,
 }: TopBarProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(title)
@@ -69,7 +77,7 @@ export function TopBar({
 
   return (
     <header
-      className={`holo-scanlines sticky top-0 z-20 flex items-center justify-between h-[56px] px-4 border-b border-[var(--line)] bg-[var(--surface)] select-none transition-shadow ${
+      className={`holo-scanlines sticky top-0 z-20 flex items-center justify-between h-[56px] px-4 border-b border-[var(--line)] bg-[#050D18]/95 backdrop-blur-md select-none transition-shadow ${
         hasScrolled ? 'shadow-md shadow-black/40' : ''
       }`}
     >
@@ -132,6 +140,22 @@ export function TopBar({
           />
           <span>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
         </div>
+
+        {/* Auto-read voice replies toggle */}
+        {(onToggleAutoSpeak || onToggleVoice) && (
+          <button
+            onClick={onToggleAutoSpeak || onToggleVoice}
+            aria-label={autoSpeak && voiceEnabled ? 'Mute automatic voice replies' : 'Enable automatic voice replies'}
+            title={autoSpeak && voiceEnabled ? 'Auto-speak replies: ON (Click to mute)' : 'Auto-speak replies: OFF (Click to enable)'}
+            className="w-11 h-11 flex items-center justify-center text-[var(--text-2)] hover:text-[var(--cyan)] hover:bg-[var(--surface-hi)] active:scale-95 transition-all cursor-pointer"
+          >
+            {autoSpeak && voiceEnabled ? (
+              <Volume2 size={18} strokeWidth={1.5} className="text-[var(--cyan)]" />
+            ) : (
+              <VolumeX size={18} strokeWidth={1.5} className="text-[var(--text-3)]" />
+            )}
+          </button>
+        )}
 
         <button
           onClick={onOpenSettings}

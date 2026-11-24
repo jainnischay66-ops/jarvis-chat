@@ -11,6 +11,7 @@ const JarvisOrb = dynamic(() => import('./JarvisOrb'), {
 
 interface HudBackdropProps {
   state?: CoreState | 'error'
+  powerState?: 'STANDBY' | 'BOOTING' | 'ACTIVE' | 'SLEEPING'
   level?: number
   hasMessages?: boolean
   messageCount?: number
@@ -29,6 +30,7 @@ const GLYPHS = [
 
 export function HudBackdrop({
   state = 'idle',
+  powerState = 'ACTIVE',
   level = 0,
   hasMessages = false,
   messageCount = 0,
@@ -159,7 +161,11 @@ export function HudBackdrop({
       {/* 3. Giant Concentric Holographic HUD Rings (SVG) */}
       <div
         className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-700 ${
-          hasMessages ? 'opacity-25' : 'opacity-85'
+          powerState === 'STANDBY'
+            ? 'opacity-25'
+            : hasMessages
+            ? 'opacity-25'
+            : 'opacity-85'
         }`}
         style={{
           transform: `translate3d(${panOffset}px, 0, 0) scale(${state === 'listening' ? 0.97 : 1})`,
@@ -174,7 +180,10 @@ export function HudBackdrop({
             state === 'error' ? 'hud-error-flicker' : ''
           }`}
           style={{
-            filter: 'drop-shadow(0 0 10px rgba(92, 203, 245, 0.35))',
+            filter:
+              powerState === 'STANDBY'
+                ? 'drop-shadow(0 0 6px rgba(242, 184, 75, 0.25))'
+                : 'drop-shadow(0 0 10px rgba(92, 203, 245, 0.35))',
           }}
         >
           <defs>
@@ -373,7 +382,11 @@ export function HudBackdrop({
             maxHeight: '100%',
           }}
         >
-          <JarvisOrb state={state === 'error' ? 'idle' : state} level={level} className="w-full h-full" />
+          <JarvisOrb
+            state={powerState === 'STANDBY' ? 'dormant' : state === 'error' ? 'idle' : state}
+            level={powerState === 'STANDBY' ? 0 : level}
+            className="w-full h-full"
+          />
         </div>
       </div>
 

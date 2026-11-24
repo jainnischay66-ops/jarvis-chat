@@ -18,9 +18,20 @@ import { ScrollToBottom } from './ScrollToBottom'
 import { SetupScreen } from './SetupScreen'
 import { SettingsSheet } from './SettingsSheet'
 import { CommandPalette } from './CommandPalette'
-import { HudBackdrop } from './HudBackdrop'
+import { Stage } from './Stage'
+import { SleepScreen } from './SleepScreen'
+import { StandbyScreen } from './StandbyScreen'
+import { BootFilm } from './BootFilm'
+import { VoiceCommandsModal } from './VoiceCommandsModal'
+import { interpretCommand } from '@/lib/commands'
+import { getAudioContext, playPowerDownSound } from '@/lib/tts'
+import { setTTSPowerState } from '@/lib/tts/tts-manager'
+import { getRandomSleepLine } from '@/lib/wakeLines'
 import type { ConfigStatus } from '@/lib/env'
 import type { CoreState } from './JarvisCore'
+
+/** If true, the power-down line is spoken aloud in SLEEPING state. */
+const SPEAK_ON_POWER_DOWN = true
 
 export default function ChatWindow() {
   const { toast } = useToast()
@@ -55,6 +66,7 @@ export default function ChatWindow() {
   }, [])
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isPaletteOpen, setIsPaletteOpen] = useState(false)
+  const [isVoiceCommandsOpen, setIsVoiceCommandsOpen] = useState(false)
   const [configStatus, setConfigStatus] = useState<ConfigStatus | null>(null)
   const [editingMessage, setEditingMessage] = useState<{ id: string; content: string } | null>(null)
 
@@ -77,6 +89,45 @@ export default function ChatWindow() {
     importData,
     clearAllData,
   } = useStorage()
+
+  const [powerState, setPowerState] = useState<'STANDBY' | 'BOOTING' | 'ACTIVE' | 'SLEEPING'>('STANDBY')
+  const [micRms, setMicRms] = useState(0)
+  const [sleepLine, setSleepLine] = useState('')
+  const initialWakeCheckedRef = useRef(false)
+
+  // Initialize power state based on preferences.rememberWakeState or ?debug=boot
+  useEffect(() => {
+    if (isStorageLoading || initialWakeCheckedRef.current) return
+    initialWakeCheckedRef.current = true
+
+    if (typeof window !== 'undefined' && window.location.search.includes('debug=boot')) {
+      setPowerState('BOOTING')
+      return
+    }
+
+    if (preferences.rememberWakeState) {
+      try {
+        const saved = localStorage.getItem('jarvis-wake-state')
+        if (saved === 'ACTIVE') {
+          setPowerState('ACTIVE')
+        }
+      } catch {}
+    }
+  }, [isStorageLoading, preferences.rememberWakeState])
+
+  const handleSetPowerState = useCallback(
+    (newState: 'STANDBY' | 'BOOTING' | 'ACTIVE' | 'SLEEPING') => {
+      setPowerState(newState)
+      // Keep TTS manager in sync so speak() is a no-op during BOOTING
+      setTTSPowerState(newState)
+      if (preferences.rememberWakeState && (newState === 'ACTIVE' || newState === 'STANDBY')) {
+        try {
+          localStorage.setItem('jarvis-wake-state', newState)
+        } catch {}
+      }
+    },
+    [preferences.rememberWakeState]
+  )
 
   // Track camera-pan direction when switching conversations
   useEffect(() => {
@@ -142,6 +193,92 @@ export default function ChatWindow() {
     [preferences.provider, preferences.model, renameConversation]
   )
 
+  // Audio reactive TTS energy level
+  const [ttsLevel, setTtsLevel] = useState(0)
+
+  // Voice hook
+  const {
+    isListening,
+    isSpeaking,
+    isSupported: voiceSupported,
+    isAudioBlocked,
+    unlockAudio,
+    startListening,
+    speak,
+    stopSpeaking,
+    enqueueStreamChunk,
+    flushStream,
+    ttsManager,
+  } = useVoice({
+    autoSpeak: preferences.autoSpeak ?? true,
+    voiceEnabled: preferences.voiceEnabled,
+    voiceProvider: preferences.voiceProvider,
+    voiceId: preferences.voiceId,
+    voiceRate: preferences.voiceRate,
+    voicePitch: preferences.voicePitch,
+    voiceVolume: preferences.voiceVolume,
+    voiceHolographicEffect: preferences.voiceHolographicEffect ?? false,
+    wakeWordEnabled: preferences.wakeWordEnabled,
+    onWakeWord: () => {
+      toast('WAKE PROTOCOL: JARVIS LISTENING')
+      handleVoiceStart()
+    },
+    onLevel: level => setTtsLevel(level),
+  })
+
+  // One-time startup boot chime & greeting on first user interaction
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const played = sessionStorage.getItem('jarvis-boot-chime')
+    if (played) return
+
+    const triggerBoot = async () => {
+      if (sessionStorage.getItem('jarvis-boot-chime')) return
+      sessionStorage.setItem('jarvis-boot-chime', 'true')
+      window.removeEventListener('click', triggerBoot)
+      window.removeEventListener('keydown', triggerBoot)
+
+      // Do not play greeting if we are already past STANDBY (e.g. wake was fast)
+      if (powerState !== 'STANDBY') return
+
+      if ((preferences.bootChimeEnabled ?? true) && (preferences.voiceEnabled ?? true)) {
+        try {
+          await unlockAudio()
+          await ttsManager.playStartupGreeting(
+            "Good evening, sir. All systems online, and I'm only slightly sarcastic about it.",
+            {
+              voice: preferences.voiceId,
+              rate: preferences.voiceRate ?? 0.98,
+              pitch: preferences.voicePitch ?? 0.85,
+              volume: preferences.voiceVolume ?? 1.0,
+              holographicEffect: preferences.voiceHolographicEffect ?? false,
+            }
+          )
+        } catch (e) {
+          console.warn('Boot chime playback error:', e)
+        }
+      }
+    }
+
+    window.addEventListener('click', triggerBoot, { once: true })
+    window.addEventListener('keydown', triggerBoot, { once: true })
+    return () => {
+      window.removeEventListener('click', triggerBoot)
+      window.removeEventListener('keydown', triggerBoot)
+    }
+  }, [
+    powerState,
+    preferences.bootChimeEnabled,
+    preferences.voiceEnabled,
+    preferences.voiceId,
+    preferences.voiceRate,
+    preferences.voicePitch,
+    preferences.voiceVolume,
+    preferences.voiceHolographicEffect,
+    ttsManager,
+    unlockAudio,
+  ])
+
   // Chat hook
   const {
     isStreaming,
@@ -157,17 +294,16 @@ export default function ChatWindow() {
     preferences,
     onUpdateConversation: updateConversation,
     onAutoTitle: handleAutoTitle,
+    onStreamChunk: chunk => {
+      enqueueStreamChunk(chunk)
+    },
+    onStreamFinish: () => {
+      flushStream()
+    },
+    onStreamAbort: () => {
+      stopSpeaking()
+    },
   })
-
-  // Voice hook
-  const {
-    isListening,
-    isSpeaking,
-    isSupported: voiceSupported,
-    startListening,
-    speak,
-    stopSpeaking,
-  } = useVoice()
 
   // Core State & Streaming Token Rate Smoothing
   const [streamLevel, setStreamLevel] = useState(0)
@@ -204,13 +340,13 @@ export default function ChatWindow() {
 
   const coreState: CoreState = isListening
     ? 'listening'
-    : isStreaming
-    ? (streamingContent ? 'speaking' : 'thinking')
     : isSpeaking
     ? 'speaking'
+    : isStreaming
+    ? (streamingContent ? 'speaking' : 'thinking')
     : 'idle'
 
-  const coreLevel = isListening ? 0.6 : streamLevel
+  const coreLevel = isListening ? 0.6 : Math.max(streamLevel, ttsLevel)
 
   // Track response latency
   useEffect(() => {
@@ -223,10 +359,29 @@ export default function ChatWindow() {
 
   const handleSendMessage = useCallback(
     async (content: string, attachments?: any[]) => {
+      unlockAudio()
+      stopSpeaking()
+      if (
+        (preferences.voiceAcknowledgements ?? true) &&
+        (preferences.autoSpeak ?? true) &&
+        (preferences.voiceEnabled ?? true)
+      ) {
+        const ack = ttsManager.getRandomAcknowledgement()
+        speak(ack)
+      }
       sendTimeRef.current = performance.now()
       sendMessage(content, attachments)
     },
-    [sendMessage]
+    [
+      sendMessage,
+      stopSpeaking,
+      speak,
+      preferences.voiceAcknowledgements,
+      preferences.autoSpeak,
+      preferences.voiceEnabled,
+      ttsManager,
+      unlockAudio,
+    ]
   )
 
   // Check backend config and align active provider if configured on server
@@ -312,25 +467,120 @@ export default function ChatWindow() {
     [toast]
   )
 
+  const handlePowerDown = useCallback(async () => {
+    const line = getRandomSleepLine()
+    setSleepLine(line)
+    handleSetPowerState('SLEEPING')
+    toast('POWER DOWN PROTOCOL ENGAGED')
+
+    const ctx = getAudioContext()
+    if (ctx) {
+      playPowerDownSound(ctx).catch(() => {})
+    }
+
+    if (
+      SPEAK_ON_POWER_DOWN &&
+      (preferences.voiceEnabled ?? true) &&
+      (preferences.autoSpeak ?? true)
+    ) {
+      speak(line)
+    }
+
+    setTimeout(() => {
+      handleSetPowerState('STANDBY')
+    }, 1800)
+  }, [handleSetPowerState, preferences.voiceEnabled, preferences.autoSpeak, speak, toast])
+
+  // Dev hooks for testing power state transitions
+  useEffect(() => {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      ;(window as any).__triggerPowerDown = handlePowerDown
+      ;(window as any).__setPowerState = handleSetPowerState
+    }
+  }, [handlePowerDown, handleSetPowerState])
+
+  const handleVoiceTranscription = useCallback(
+    async (transcript: string) => {
+      const text = transcript.trim()
+      if (!text) return
+
+      // Run 2-layer intent interpretation
+      const match = await interpretCommand(text, { allowLayer2: true })
+
+      switch (match.intent) {
+        case 'WAKE':
+          toast('SYSTEM ALREADY ONLINE')
+          if (preferences.autoSpeak ?? true) {
+            speak("I'm already here and operational, sir.")
+          }
+          break
+
+        case 'SLEEP':
+          handlePowerDown()
+          break
+
+        case 'NEW_ARCHIVE':
+          toast('PROTOCOL: NEW ARCHIVE INITIALIZED')
+          createConversation()
+          if (preferences.autoSpeak ?? true) {
+            speak('Initializing a clean protocol, sir.')
+          }
+          break
+
+        case 'OPEN_SETTINGS':
+          toast('PROTOCOL: OPENING CONFIGURATION')
+          setIsSettingsOpen(true)
+          if (preferences.autoSpeak ?? true) {
+            speak('Opening configuration.')
+          }
+          break
+
+        case 'MUTE':
+          updatePreferences({ autoSpeak: false })
+          toast('VOICE OUTPUT MUTED')
+          break
+
+        case 'UNMUTE':
+          updatePreferences({ autoSpeak: true })
+          toast('VOICE OUTPUT ENABLED')
+          speak('Voice protocols restored, sir.')
+          break
+
+        case 'STOP':
+          stopStreaming()
+          stopSpeaking()
+          toast('HALTING ALL OUTPUT')
+          break
+
+        case 'CHAT':
+        default:
+          handleSendMessage(text)
+          break
+      }
+    },
+    [
+      createConversation,
+      handlePowerDown,
+      handleSendMessage,
+      preferences.autoSpeak,
+      speak,
+      stopSpeaking,
+      stopStreaming,
+      toast,
+      updatePreferences,
+    ]
+  )
+
   const handleVoiceStart = useCallback(() => {
     if (isListening) return
+    stopSpeaking()
     startListening((transcript: string) => {
-      if (transcript.trim()) {
-        sendMessage(transcript)
-      }
+      handleVoiceTranscription(transcript)
     })
-  }, [isListening, startListening, sendMessage])
+  }, [isListening, startListening, handleVoiceTranscription, stopSpeaking])
 
   if (configStatus && !configStatus.configured) {
     return <SetupScreen provider={configStatus.provider} error={configStatus.error} />
-  }
-
-  if (isStorageLoading) {
-    return (
-      <div className="flex items-center justify-center h-[100dvh] bg-[var(--bg)] font-hud text-sm tracking-wider text-[var(--cyan)]">
-        SYSTEM BOOTING...
-      </div>
-    )
   }
 
   const grouped = getGroupedConversations()
@@ -341,48 +591,80 @@ export default function ChatWindow() {
   )
 
   return (
-    <div
-      className={`app h-[100dvh] w-full bg-[var(--bg)] text-[var(--text)] overflow-hidden relative ${
-        sidebarOpen ? '' : 'sidebar-closed'
-      }`}
-    >
-      {/* Offline banner */}
-      {!isOnline && (
-        <div className="fixed top-0 inset-x-0 z-50 bg-[var(--red)] text-white text-center py-1 font-hud text-xs tracking-wider">
-          OFFLINE PROTOCOL ENGAGED · RECONNECTING...
-        </div>
-      )}
-
-      {/* Left Sidebar (col 1 of .app grid) */}
-      <Sidebar
-        isOpen={sidebarOpen}
-        groupedConversations={grouped}
-        currentId={currentConversation?.id}
-        onClose={() => setSidebarOpen(false)}
-        onSelect={selectConversation}
-        onNewChat={() => createConversation()}
-        onRename={renameConversation}
-        onPin={pinConversation}
-        onDelete={handleDeleteConversation}
+    <div className="relative w-screen h-[100dvh] overflow-hidden bg-[#02040A]">
+      {/* 1. Persistent Stage: Mounted ONCE, never unmounts across power states */}
+      <Stage
+        powerState={powerState}
+        coreState={coreState}
+        coreLevel={coreLevel}
+        hasMessages={hasMessages}
+        isOnline={isOnline}
+        isListening={isListening}
+        micRms={micRms}
+        panOffset={isPanning ? panDirection * -24 : 0}
+        reducedMotion={reducedMotion}
       />
 
-      {/* Main Chat Area (col 2 of .app grid): 3 rows: TopBar (56px), Scroll (minmax(0, 1fr)), Composer (auto) */}
-      <main className="main h-full min-h-0 min-w-0 relative z-10 overflow-hidden">
-        {/* Living Holographic HUD Backdrop: placed INSIDE .main so center is chat center and bounds are clipped */}
-        <HudBackdrop
-          state={coreState}
-          level={coreLevel}
-          hasMessages={hasMessages}
-          messageCount={currentConversation?.messages?.length || 0}
-          lastLatencyMs={lastLatencyMs}
-          isOnline={isOnline}
-          panOffset={isPanning ? panDirection * -24 : 0}
-          isPanning={isPanning}
-          composerHeight={80}
+      {/* 2. STANDBY State Overlay */}
+      {powerState === 'STANDBY' && (
+        <StandbyScreen
+          onWake={() => handleSetPowerState('BOOTING')}
+          autoListen={preferences.listenWakePhraseWhileTabOpen}
+          onMicLevel={setMicRms}
+          speakText={async text => {
+            await unlockAudio()
+            speak(text)
+          }}
         />
+      )}
 
-        {/* Row 1: Top Bar (56px) */}
-        <TopBar
+      {/* 3. BOOTING State Overlay (Film) */}
+      {powerState === 'BOOTING' && (
+        <BootFilm
+          initialDebug={typeof window !== 'undefined' && window.location.search.includes('debug=boot')}
+          onComplete={() => handleSetPowerState('ACTIVE')}
+          speakGreeting={async () => {
+            // No-op: zero TTS during BOOTING. Wake line is silent caption only.
+          }}
+          volume={preferences.voiceVolume ?? 1.0}
+          isMuted={!(preferences.autoSpeak ?? true) || !(preferences.voiceEnabled ?? true)}
+        />
+      )}
+
+      {/* 4. SLEEPING State Overlay */}
+      {powerState === 'SLEEPING' && <SleepScreen sleepLine={sleepLine} />}
+
+      {/* 5. ACTIVE State Chat Application */}
+      {powerState === 'ACTIVE' && (
+        <div
+          className={`app h-[100dvh] w-full bg-transparent text-[var(--text)] overflow-hidden relative z-10 transition-opacity duration-1000 ${
+            sidebarOpen ? '' : 'sidebar-closed'
+          }`}
+        >
+          {/* Offline banner */}
+          {!isOnline && (
+            <div className="fixed top-0 inset-x-0 z-50 bg-[var(--red)] text-white text-center py-1 font-hud text-xs tracking-wider">
+              OFFLINE PROTOCOL ENGAGED · RECONNECTING...
+            </div>
+          )}
+
+          {/* Left Sidebar (col 1 of .app grid) */}
+          <Sidebar
+            isOpen={sidebarOpen}
+            groupedConversations={grouped}
+            currentId={currentConversation?.id}
+            onClose={() => setSidebarOpen(false)}
+            onSelect={selectConversation}
+            onNewChat={() => createConversation()}
+            onRename={renameConversation}
+            onPin={pinConversation}
+            onDelete={handleDeleteConversation}
+          />
+
+          {/* Main Chat Area (col 2 of .app grid): 3 rows: TopBar (56px), Scroll (minmax(0, 1fr)), Composer (auto) */}
+          <main className="main h-full min-h-0 min-w-0 relative z-10 overflow-hidden">
+            {/* Row 1: Top Bar (56px) */}
+            <TopBar
           title={currentTitle}
           modelName={modelName}
           hasScrolled={hasScrolled}
@@ -397,6 +679,14 @@ export default function ChatWindow() {
           isOnline={isOnline}
           hasMessages={hasMessages}
           coreState={coreState}
+          voiceEnabled={preferences.voiceEnabled ?? true}
+          onToggleVoice={() =>
+            updatePreferences({ voiceEnabled: !(preferences.voiceEnabled ?? true) })
+          }
+          autoSpeak={preferences.autoSpeak ?? true}
+          onToggleAutoSpeak={() =>
+            updatePreferences({ autoSpeak: !(preferences.autoSpeak ?? true) })
+          }
         />
 
         {/* Row 2: Scroll area */}
@@ -507,6 +797,18 @@ export default function ChatWindow() {
             visible={showScrollButton}
             onClick={() => scrollToBottom('smooth')}
           />
+
+          {/* Autoplay blocked unlock chip */}
+          {isAudioBlocked && (
+            <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40">
+              <button
+                onClick={unlockAudio}
+                className="flex items-center gap-2 px-3 py-1.5 bg-[var(--surface-hi)] border border-[var(--cyan)] text-[var(--cyan)] font-hud text-xs tracking-wider shadow-[0_0_12px_rgba(92,203,245,0.3)] active:scale-95 transition-all cursor-pointer"
+              >
+                <span>🔊 TAP TO ENABLE VOICE</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Row 3: Composer wrapper in flow (NOT fixed or absolute) */}
@@ -532,9 +834,16 @@ export default function ChatWindow() {
               onVoiceStart={handleVoiceStart}
               isListening={isListening}
               keyboardHeight={keyboardHeight}
+              onOpenVoiceCommands={() => setIsVoiceCommandsOpen(true)}
             />
           </div>
         </div>
+
+        {/* Voice Commands Modal */}
+        <VoiceCommandsModal
+          isOpen={isVoiceCommandsOpen}
+          onClose={() => setIsVoiceCommandsOpen(false)}
+        />
 
         {/* Settings Sheet */}
         <SettingsSheet
@@ -545,6 +854,12 @@ export default function ChatWindow() {
           conversations={conversations}
           onImportData={importData}
           onClearAllData={clearAllData}
+          onReplayIntro={() => {
+            try {
+              sessionStorage.removeItem('jarvis-has-booted')
+            } catch {}
+            handleSetPowerState('BOOTING')
+          }}
         />
 
         {/* Command Palette */}
@@ -560,5 +875,7 @@ export default function ChatWindow() {
         />
       </main>
     </div>
+  )}
+</div>
   )
 }

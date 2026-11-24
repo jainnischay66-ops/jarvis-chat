@@ -12,6 +12,17 @@ export const serverEnvSchema = z.object({
   MAX_CONTEXT_MESSAGES: z.coerce.number().default(50),
   MAX_MESSAGE_LENGTH: z.coerce.number().default(12000),
   MAX_ATTACHMENT_SIZE: z.coerce.number().default(10485760),
+  TTS_PROVIDER: z.enum(['browser', 'openai', 'elevenlabs', 'azure', 'google']).default('openai'),
+  OPENAI_TTS_MODEL: z.string().default('tts-1'),
+  OPENAI_TTS_VOICE: z.string().default('onyx'),
+  TTS_OPENAI_VOICE: z.string().default('onyx'),
+  ELEVENLABS_API_KEY: z.string().optional(),
+  ELEVENLABS_VOICE_ID: z.string().default('pNInz6obpgDQGcFmaJgB'),
+  AZURE_SPEECH_KEY: z.string().optional(),
+  AZURE_SPEECH_REGION: z.string().default('eastus'),
+  AZURE_SPEECH_VOICE: z.string().default('en-GB-RyanNeural'),
+  GOOGLE_TTS_API_KEY: z.string().optional(),
+  GOOGLE_TTS_VOICE: z.string().default('en-GB-Neural2-B'),
 })
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>
@@ -44,6 +55,18 @@ function redactKey(message: string): string {
   const openaiKey = process.env.OPENAI_API_KEY
   if (openaiKey && openaiKey.trim()) {
     result = result.split(openaiKey.trim()).join('[REDACTED]')
+  }
+  const elevenKey = process.env.ELEVENLABS_API_KEY
+  if (elevenKey && elevenKey.trim()) {
+    result = result.split(elevenKey.trim()).join('[REDACTED]')
+  }
+  const azureKey = process.env.AZURE_SPEECH_KEY
+  if (azureKey && azureKey.trim()) {
+    result = result.split(azureKey.trim()).join('[REDACTED]')
+  }
+  const googleKey = process.env.GOOGLE_TTS_API_KEY
+  if (googleKey && googleKey.trim()) {
+    result = result.split(googleKey.trim()).join('[REDACTED]')
   }
   // Redact common API key patterns (Google AI Studio, Anthropic, OpenAI)
   result = result

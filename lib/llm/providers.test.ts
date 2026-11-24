@@ -126,13 +126,142 @@ describe('OpenAICompatibleProvider', () => {
     const chunks = []
     for await (const chunk of provider.stream(
       [{ id: '1', role: 'user', content: 'hello', createdAt: 0 }],
-      { model: 'gpt-4o-mini' }
+      { model: 'gpt-4o-mini', retryDelayMs: 1 }
     )) {
       chunks.push(chunk)
     }
 
     expect(chunks[0].type).toBe('error')
     expect(chunks[0].content).toContain('Rate limit or quota exceeded (429)')
+  })
+
+  it('fails once with "fetch failed" then succeeds -> no error shown', async () => {
+    const ssePayload = 'data: {"choices":[{"delta":{"content":"Recovered successfully"}}]}\n\ndata: [DONE]\n\n'
+    const successResponse = new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(ssePayload))
+          controller.close()
+        },
+      }),
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+    )
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNRESET' } }))
+      .mockResolvedValueOnce(successResponse)
+
+    const provider = new OpenAICompatibleProvider()
+    const chunks = []
+    for await (const chunk of provider.stream(
+      [{ id: '1', role: 'user', content: 'hello', createdAt: 0 }],
+      { model: 'gpt-4o-mini', retryDelayMs: 1 }
+    )) {
+      chunks.push(chunk)
+    }
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(chunks).toEqual([
+      { type: 'text', content: 'Recovered successfully' },
+      { type: 'done', content: '' },
+    ])
+  })
+
+  it('fails 3 times -> friendly network error with cause code and Retry Protocol button available', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockRejectedValue(Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } }))
+
+    const provider = new OpenAICompatibleProvider()
+    const chunks = []
+    for await (const chunk of provider.stream(
+      [{ id: '1', role: 'user', content: 'hello', createdAt: 0 }],
+      { model: 'gpt-4o-mini', retryDelayMs: 1 }
+    )) {
+      chunks.push(chunk)
+    }
+
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
+    expect(chunks.length).toBe(1)
+    expect(chunks[0].type).toBe('error')
+    expect(chunks[0].content).toContain('DNS lookup failed (ENOTFOUND)')
+    expect(chunks[0].content).toContain('OPENAI_BASE_URL in .env.local')
+  })
+
+  it('no retry once streaming has started', async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"Chunk 1"}}]}\n\n'))
+      },
+      pull(controller) {
+        controller.error(new Error('Connection dropped during streaming'))
+      },
+    })
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+    )
+
+    const provider = new OpenAICompatibleProvider()
+    const chunks = []
+    for await (const chunk of provider.stream(
+      [{ id: '1', role: 'user', content: 'hello', createdAt: 0 }],
+      { model: 'gpt-4o-mini', retryDelayMs: 1 }
+    )) {
+      chunks.push(chunk)
+    }
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(chunks[0]).toEqual({ type: 'text', content: 'Chunk 1' })
+    expect(chunks[1].type).toBe('error')
+    expect(chunks[1].content).toContain('Connection interrupted while streaming response')
+  })
+
+  it('401 is not retried', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: 'Invalid API key' } }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+
+    const provider = new OpenAICompatibleProvider()
+    const chunks = []
+    for await (const chunk of provider.stream(
+      [{ id: '1', role: 'user', content: 'hello', createdAt: 0 }],
+      { model: 'gpt-4o-mini', retryDelayMs: 1 }
+    )) {
+      chunks.push(chunk)
+    }
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(chunks[0].type).toBe('error')
+    expect(chunks[0].content).toContain('Invalid API key (401)')
+  })
+
+  it('the abort stops retries', async () => {
+    const abortController = new AbortController()
+    let calls = 0
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      calls++
+      if (calls === 1) {
+        // Abort while waiting
+        setTimeout(() => abortController.abort(), 0)
+        throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNRESET' } })
+      }
+      return new Response('{}', { status: 200 })
+    })
+
+    const provider = new OpenAICompatibleProvider()
+    const chunks = []
+    for await (const chunk of provider.stream(
+      [{ id: '1', role: 'user', content: 'hello', createdAt: 0 }],
+      { model: 'gpt-4o-mini', retryDelayMs: 50, signal: abortController.signal }
+    )) {
+      chunks.push(chunk)
+    }
+
+    expect(calls).toBe(1)
+    expect(chunks).toEqual([{ type: 'done', content: '' }])
   })
 })
 

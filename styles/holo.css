@@ -10,7 +10,7 @@
   grid-template-columns: 260px minmax(0, 1fr);
   transition: grid-template-columns 250ms cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
-  background: var(--bg);
+  background: transparent;
 }
 
 .app.sidebar-closed {

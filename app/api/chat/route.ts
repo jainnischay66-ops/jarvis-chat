@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
 import { getProvider } from '@/lib/llm'
+import { JARVIS_SYSTEM_PROMPT } from '@/lib/llm/persona'
 import { getServerEnv, validateApiKey, getConfigStatus } from '@/lib/env'
 import { checkRateLimit } from '@/lib/rate-limit'
 import type { Message, ProviderName } from '@/lib/llm/types'
@@ -75,8 +76,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Build messages with system prompt
-    const messages: Message[] = []
+    // Build messages with JARVIS persona as the first system instruction
+    const messages: Message[] = [
+      {
+        id: 'jarvis-persona',
+        role: 'system',
+        content: JARVIS_SYSTEM_PROMPT,
+        createdAt: 0,
+      },
+    ]
     if (body.systemPrompt) {
       messages.push({
         id: 'system',

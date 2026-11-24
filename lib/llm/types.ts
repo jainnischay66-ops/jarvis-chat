@@ -22,6 +22,8 @@ export interface StreamOptions {
   temperature?: number
   maxTokens?: number
   signal?: AbortSignal
+  retryDelayMs?: number
+  timeoutMs?: number
 }
 
 export interface StreamChunk {

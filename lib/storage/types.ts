@@ -49,6 +49,20 @@ export interface UIPreferences {
   maxContextMessages: number
   systemPrompt: string
   readAloud: boolean
+  autoSpeak: boolean
   provider: 'gemini' | 'anthropic' | 'openai-compatible'
   model: string
+  // Voice preferences
+  voiceEnabled: boolean
+  voiceProvider: 'browser' | 'cloud'
+  voiceId?: string
+  voiceRate: number
+  voicePitch: number
+  voiceVolume: number
+  voiceHolographicEffect: boolean
+  bootChimeEnabled: boolean
+  voiceAcknowledgements: boolean
+  wakeWordEnabled: boolean
+  rememberWakeState: boolean
+  listenWakePhraseWhileTabOpen: boolean
 }

@@ -187,9 +187,10 @@ function Scene({ state, level, onActivate }: { state: CoreState; level: number; 
 
   useFrame((s, rawDt) => {
     const dt = Math.min(rawDt, 0.05), t = s.clock.elapsedTime, L = live.current;
+    const isDormant = state === "dormant";
     L.assemble = Math.min(1, L.assemble + dt / 2.4);
     L.think += ((state === "thinking" ? 1 : 0) - L.think) * Math.min(1, dt * 3);
-    const target = state === "speaking" || state === "listening" ? level : 0;
+    const target = (state === "speaking" || state === "listening") ? level : 0;
     L.level += (target - L.level) * Math.min(1, dt * 10);
     L.pulse = Math.max(0, L.pulse - dt * 1.4);
     L.spin += dt * L.think * 1.4;
@@ -200,12 +201,14 @@ function Scene({ state, level, onActivate }: { state: CoreState; level: number; 
     uniforms.uSpin.value = L.spin; uniforms.uPx.value = s.viewport.dpr;
     uniforms.uWarm.value = L.warm;
     glowU.uThink.value = L.think;
-    glowU.uInt.value = 0.8 + L.level * 1.2 + L.pulse * 0.8 + Math.sin(t * 1.4) * 0.1;
+    glowU.uInt.value = isDormant
+      ? 0.32 + Math.sin(t * 0.8) * 0.06
+      : 0.8 + L.level * 1.2 + L.pulse * 0.8 + Math.sin(t * 1.4) * 0.1;
 
-    root.current.rotation.y += dt * (0.08 + L.think * 0.5);
-    rings.current.scale.setScalar(1 + L.level * 0.06 + L.pulse * 0.04);
-    glow.current.scale.setScalar(1 + L.level * 0.5 + L.pulse * 0.3);
-    grid.current.position.z = (t * 0.5) % 1;
+    root.current.rotation.y += dt * (isDormant ? 0.02 : 0.08 + L.think * 0.5);
+    rings.current.scale.setScalar(isDormant ? 0.94 : 1 + L.level * 0.06 + L.pulse * 0.04);
+    glow.current.scale.setScalar(isDormant ? 0.8 : 1 + L.level * 0.5 + L.pulse * 0.3);
+    grid.current.position.z = (t * (isDormant ? 0.1 : 0.5)) % 1;
 
     s.camera.position.set(0, 0, 8.2);
     s.camera.lookAt(0, 0, 0);
@@ -243,9 +246,23 @@ function Scene({ state, level, onActivate }: { state: CoreState; level: number; 
   );
 }
 
+let canvasMountCount = 0;
+
 export default function JarvisOrb({ state = "idle", level = 0, className, onActivate }:
   { state?: CoreState; level?: number; className?: string; onActivate?: () => void }) {
   const [visible, setVisible] = useState(true);
+  const mountRef = useRef(false);
+
+  useEffect(() => {
+    if (!mountRef.current) {
+      mountRef.current = true;
+      canvasMountCount++;
+      if (typeof window !== "undefined") {
+        (window as any).__CANVAS_MOUNT_COUNT__ = canvasMountCount;
+        (window as any).__STAGE_CANVAS_MOUNTS__ = canvasMountCount;
+      }
+    }
+  }, []);
   useEffect(() => {
     const f = () => setVisible(!document.hidden);
     f();

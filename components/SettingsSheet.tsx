@@ -4,9 +4,10 @@ import React, { useState, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import * as Slider from '@radix-ui/react-slider'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Download, Upload, Trash2, Eye, Sliders, Layers } from 'lucide-react'
+import { X, Download, Upload, Trash2, Eye, Sliders, Layers, Volume2, VolumeX, Mic, Play, RefreshCw, Film } from 'lucide-react'
 import { SHORTCUTS } from '@/hooks/useKeyboardShortcuts'
 import { DEFAULT_SYSTEM_PROMPT, type UIPreferences, type Conversation } from '@/lib/storage'
+import { getTTSManager, type TTSVoice } from '@/lib/tts'
 import type { ProviderName } from '@/lib/llm/types'
 
 interface SettingsSheetProps {
@@ -17,6 +18,7 @@ interface SettingsSheetProps {
   conversations: Conversation[]
   onImportData: (json: string) => Promise<void>
   onClearAllData: () => Promise<void>
+  onReplayIntro?: () => void
 }
 
 export function SettingsSheet({
@@ -27,6 +29,7 @@ export function SettingsSheet({
   conversations,
   onImportData,
   onClearAllData,
+  onReplayIntro,
 }: SettingsSheetProps) {
   const [confirmClear, setConfirmClear] = useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -35,6 +38,40 @@ export function SettingsSheet({
   const [scanlines, setScanlines] = useState(true)
   const [holoEffects, setHoloEffects] = useState(true)
   const [reducedMotionSystem, setReducedMotionSystem] = useState(false)
+
+  // Voice Settings & Voice List
+  const [voices, setVoices] = useState<TTSVoice[]>([])
+  const [isTestingVoice, setIsTestingVoice] = useState(false)
+
+  useEffect(() => {
+    const tts = getTTSManager()
+    tts.getVoices(preferences.voiceProvider || 'browser')
+      .then(list => setVoices(list))
+      .catch(() => {})
+  }, [preferences.voiceProvider])
+
+  const handleTestVoice = async () => {
+    if (isTestingVoice) return
+    setIsTestingVoice(true)
+    try {
+      const tts = getTTSManager()
+      await tts.speakText(
+        'All systems nominal, sir. Standing by.',
+        {
+          voice: preferences.voiceId,
+          rate: preferences.voiceRate ?? 0.95,
+          pitch: preferences.voicePitch ?? 0.9,
+          volume: preferences.voiceVolume ?? 1.0,
+          holographicEffect: preferences.voiceHolographicEffect ?? true,
+        },
+        preferences.voiceProvider || 'browser'
+      )
+    } catch (e) {
+      console.warn('Voice test failed:', e)
+    } finally {
+      setIsTestingVoice(false)
+    }
+  }
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -357,6 +394,343 @@ export function SettingsSheet({
                         }
                         className="w-16 px-2 py-1 bg-[var(--surface)] text-[var(--text)] text-right font-mono border border-[var(--line)] focus:border-[var(--cyan)] outline-none"
                       />
+                    </div>
+                  </section>
+
+                  {/* VOICE & AUDIO PROTOCOLS */}
+                  <section className="space-y-3">
+                    <h3 className="font-hud text-xs font-semibold uppercase tracking-wider text-[var(--cyan-dim)] px-1">
+                      VOICE & ACOUSTIC TELEMETRY
+                    </h3>
+                    <div className="p-3.5 bg-[var(--surface-hi)] border border-[var(--line)] space-y-3.5">
+                      {/* Master Voice Toggle */}
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <div className="font-hud tracking-wider text-[var(--text)]">
+                            JARVIS VOCAL RESPONSE
+                          </div>
+                          <div className="font-mono text-[11px] text-[var(--text-3)]">
+                            Vocalizes responses via streaming audio synthesis
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => onUpdatePreferences({ voiceEnabled: !(preferences.voiceEnabled ?? true) })}
+                          className={`px-3 py-1 font-hud tracking-widest text-xs border transition-all ${
+                            (preferences.voiceEnabled ?? true)
+                              ? 'border-[var(--cyan)] text-[var(--cyan)] bg-[var(--cyan-faint)]'
+                              : 'border-[var(--line)] text-[var(--text-3)] bg-[var(--surface)]'
+                          }`}
+                        >
+                          {(preferences.voiceEnabled ?? true) ? 'ACTIVE' : 'MUTED'}
+                        </button>
+                      </div>
+
+                      {/* Auto-Read Replies Toggle */}
+                      <div className="flex items-center justify-between border-t border-[var(--line)] pt-3">
+                        <div className="space-y-0.5">
+                          <div className="font-hud tracking-wider text-[var(--text)]">
+                            AUTOMATIC VOICE REPLIES
+                          </div>
+                          <div className="font-mono text-[11px] text-[var(--text-3)]">
+                            Automatically speaks incoming assistant responses sentence-by-sentence
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => onUpdatePreferences({ autoSpeak: !(preferences.autoSpeak ?? true) })}
+                          className={`px-3 py-1 font-hud tracking-widest text-xs border transition-all ${
+                            (preferences.autoSpeak ?? true)
+                              ? 'border-[var(--cyan)] text-[var(--cyan)] bg-[var(--cyan-faint)]'
+                              : 'border-[var(--line)] text-[var(--text-3)] bg-[var(--surface)]'
+                          }`}
+                        >
+                          {(preferences.autoSpeak ?? true) ? 'ENABLED' : 'MUTED'}
+                        </button>
+                      </div>
+
+                      {/* Synthesis Provider Selector */}
+                      <div className="space-y-1.5 border-t border-[var(--line)] pt-3">
+                        <label className="font-hud text-xs tracking-wider text-[var(--text-2)]">
+                          ACOUSTIC SYNTHESIZER
+                        </label>
+                        <div className="grid grid-cols-2 gap-1 bg-[var(--surface)] p-1 border border-[var(--line)] text-xs font-hud">
+                          <button
+                            type="button"
+                            onClick={() => onUpdatePreferences({ voiceProvider: 'browser' })}
+                            className={`py-1.5 px-2 tracking-wider transition-all cursor-pointer text-center ${
+                              (preferences.voiceProvider || 'browser') === 'browser'
+                                ? 'bg-[var(--surface-hi)] text-[var(--cyan)] border border-[var(--cyan)] font-semibold shadow-[0_0_8px_rgba(92,203,245,0.2)]'
+                                : 'text-[var(--text-3)] hover:text-[var(--text)]'
+                            }`}
+                          >
+                            BROWSER (NATIVE)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onUpdatePreferences({ voiceProvider: 'cloud' })}
+                            className={`py-1.5 px-2 tracking-wider transition-all cursor-pointer text-center ${
+                              preferences.voiceProvider === 'cloud'
+                                ? 'bg-[var(--surface-hi)] text-[var(--cyan)] border border-[var(--cyan)] font-semibold shadow-[0_0_8px_rgba(92,203,245,0.2)]'
+                                : 'text-[var(--text-3)] hover:text-[var(--text)]'
+                            }`}
+                          >
+                            CLOUD (HI-FI)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Voice Selection */}
+                      <div className="space-y-1.5 border-t border-[var(--line)] pt-3">
+                        <label className="font-hud text-xs tracking-wider text-[var(--text-2)]">
+                          VOCAL PROFILE MATRIX
+                        </label>
+                        <select
+                          value={preferences.voiceId || ''}
+                          onChange={e => onUpdatePreferences({ voiceId: e.target.value })}
+                          className="w-full px-2.5 py-1.5 bg-[var(--surface)] text-[var(--text)] font-mono text-xs border border-[var(--line)] focus:border-[var(--cyan)] outline-none"
+                        >
+                          <option value="">Default (Auto-Selected British Male)</option>
+                          {voices.map(v => (
+                            <option key={v.id} value={v.id}>
+                              {v.name} ({v.lang})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Rate / Speed Slider */}
+                      <div className="space-y-1.5 border-t border-[var(--line)] pt-3">
+                        <div className="flex items-center justify-between font-hud text-xs">
+                          <span className="tracking-wider text-[var(--text-2)]">SYNTHESIS PACE (RATE)</span>
+                          <span className="font-mono text-[var(--cyan)]">
+                            {(preferences.voiceRate ?? 0.95).toFixed(2)}x
+                          </span>
+                        </div>
+                        <Slider.Root
+                          className="relative flex items-center select-none touch-none w-full h-5"
+                          value={[preferences.voiceRate ?? 0.95]}
+                          onValueChange={([val]) => onUpdatePreferences({ voiceRate: val })}
+                          min={0.5}
+                          max={1.8}
+                          step={0.05}
+                        >
+                          <Slider.Track className="bg-[var(--surface)] relative grow h-1 border border-[var(--line)]">
+                            <Slider.Range className="absolute bg-[var(--cyan)] h-full" />
+                          </Slider.Track>
+                          <Slider.Thumb
+                            className="block w-3.5 h-3.5 bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)] focus:outline-none cursor-grab active:cursor-grabbing"
+                            aria-label="Voice rate"
+                          />
+                        </Slider.Root>
+                      </div>
+
+                      {/* Pitch Slider */}
+                      <div className="space-y-1.5 border-t border-[var(--line)] pt-3">
+                        <div className="flex items-center justify-between font-hud text-xs">
+                          <span className="tracking-wider text-[var(--text-2)]">RESONANCE (PITCH)</span>
+                          <span className="font-mono text-[var(--cyan)]">
+                            {(preferences.voicePitch ?? 0.9).toFixed(2)}
+                          </span>
+                        </div>
+                        <Slider.Root
+                          className="relative flex items-center select-none touch-none w-full h-5"
+                          value={[preferences.voicePitch ?? 0.9]}
+                          onValueChange={([val]) => onUpdatePreferences({ voicePitch: val })}
+                          min={0.5}
+                          max={1.5}
+                          step={0.05}
+                        >
+                          <Slider.Track className="bg-[var(--surface)] relative grow h-1 border border-[var(--line)]">
+                            <Slider.Range className="absolute bg-[var(--cyan)] h-full" />
+                          </Slider.Track>
+                          <Slider.Thumb
+                            className="block w-3.5 h-3.5 bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)] focus:outline-none cursor-grab active:cursor-grabbing"
+                            aria-label="Voice pitch"
+                          />
+                        </Slider.Root>
+                      </div>
+
+                      {/* Volume Slider */}
+                      <div className="space-y-1.5 border-t border-[var(--line)] pt-3">
+                        <div className="flex items-center justify-between font-hud text-xs">
+                          <span className="tracking-wider text-[var(--text-2)]">OUTPUT AMPLITUDE</span>
+                          <span className="font-mono text-[var(--cyan)]">
+                            {Math.round((preferences.voiceVolume ?? 1.0) * 100)}%
+                          </span>
+                        </div>
+                        <Slider.Root
+                          className="relative flex items-center select-none touch-none w-full h-5"
+                          value={[preferences.voiceVolume ?? 1.0]}
+                          onValueChange={([val]) => onUpdatePreferences({ voiceVolume: val })}
+                          min={0.1}
+                          max={1.0}
+                          step={0.05}
+                        >
+                          <Slider.Track className="bg-[var(--surface)] relative grow h-1 border border-[var(--line)]">
+                            <Slider.Range className="absolute bg-[var(--cyan)] h-full" />
+                          </Slider.Track>
+                          <Slider.Thumb
+                            className="block w-3.5 h-3.5 bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)] focus:outline-none cursor-grab active:cursor-grabbing"
+                            aria-label="Voice volume"
+                          />
+                        </Slider.Root>
+                      </div>
+
+                      {/* DSP Holographic Effects Toggle */}
+                      <div className="flex items-center justify-between border-t border-[var(--line)] pt-3">
+                        <div className="space-y-0.5">
+                          <div className="font-hud tracking-wider text-[var(--text)]">
+                            HOLOGRAPHIC ACOUSTIC DSP
+                          </div>
+                          <div className="font-mono text-[11px] text-[var(--text-3)]">
+                            Subtle highpass 100Hz, +2dB @ 3kHz and short room reverb (default OFF for human tone)
+                          </div>
+                        </div>
+                        <button
+                          onClick={() =>
+                            onUpdatePreferences({
+                              voiceHolographicEffect: !(preferences.voiceHolographicEffect ?? false),
+                            })
+                          }
+                          className={`px-3 py-1 font-hud tracking-widest text-xs border transition-all ${
+                            (preferences.voiceHolographicEffect ?? false)
+                              ? 'border-[var(--cyan)] text-[var(--cyan)] bg-[var(--cyan-faint)]'
+                              : 'border-[var(--line)] text-[var(--text-3)] bg-[var(--surface)]'
+                          }`}
+                        >
+                          {(preferences.voiceHolographicEffect ?? false) ? 'ACTIVE' : 'OFF'}
+                        </button>
+                      </div>
+
+                      {/* Boot Chime Toggle */}
+                      <div className="flex items-center justify-between border-t border-[var(--line)] pt-3">
+                        <div className="space-y-0.5">
+                          <div className="font-hud tracking-wider text-[var(--text)]">
+                            STARTUP BOOT CHIME
+                          </div>
+                          <div className="font-mono text-[11px] text-[var(--text-3)]">
+                            Plays Mark III boot chord & greeting on initial protocol engagement
+                          </div>
+                        </div>
+                        <button
+                          onClick={() =>
+                            onUpdatePreferences({
+                              bootChimeEnabled: !(preferences.bootChimeEnabled ?? true),
+                            })
+                          }
+                          className={`px-3 py-1 font-hud tracking-widest text-xs border transition-all ${
+                            (preferences.bootChimeEnabled ?? true)
+                              ? 'border-[var(--cyan)] text-[var(--cyan)] bg-[var(--cyan-faint)]'
+                              : 'border-[var(--line)] text-[var(--text-3)] bg-[var(--surface)]'
+                          }`}
+                        >
+                          {(preferences.bootChimeEnabled ?? true) ? 'ACTIVE' : 'OFF'}
+                        </button>
+                      </div>
+
+                      {/* Stark Acknowledgements Toggle */}
+                      <div className="flex items-center justify-between border-t border-[var(--line)] pt-3">
+                        <div className="space-y-0.5">
+                          <div className="font-hud tracking-wider text-[var(--text)]">
+                            TACTICAL ACKNOWLEDGEMENTS
+                          </div>
+                          <div className="font-mono text-[11px] text-[var(--text-3)]">
+                            Vocal affirmations ("Right away, sir.") when dispatching queries
+                          </div>
+                        </div>
+                        <button
+                          onClick={() =>
+                            onUpdatePreferences({
+                              voiceAcknowledgements: !(preferences.voiceAcknowledgements ?? true),
+                            })
+                          }
+                          className={`px-3 py-1 font-hud tracking-widest text-xs border transition-all ${
+                            (preferences.voiceAcknowledgements ?? true)
+                              ? 'border-[var(--cyan)] text-[var(--cyan)] bg-[var(--cyan-faint)]'
+                              : 'border-[var(--line)] text-[var(--text-3)] bg-[var(--surface)]'
+                          }`}
+                        >
+                          {(preferences.voiceAcknowledgements ?? true) ? 'ACTIVE' : 'OFF'}
+                        </button>
+                      </div>
+
+                      {/* Wake Word ("Hey Jarvis") */}
+                      <div className="flex items-center justify-between border-t border-[var(--line)] pt-3">
+                        <div className="space-y-0.5">
+                          <div className="font-hud tracking-wider text-[var(--text)]">
+                            LISTEN FOR WAKE PHRASE WHILE OPEN
+                          </div>
+                          <div className="font-mono text-[11px] text-[var(--text-3)]">
+                            Auto-listens for "Wake up, JARVIS" while this browser tab remains active
+                          </div>
+                        </div>
+                        <button
+                          onClick={() =>
+                            onUpdatePreferences({
+                              listenWakePhraseWhileTabOpen: !(preferences.listenWakePhraseWhileTabOpen ?? false),
+                            })
+                          }
+                          className={`px-3 py-1 font-hud tracking-widest text-xs border transition-all ${
+                            (preferences.listenWakePhraseWhileTabOpen ?? false)
+                              ? 'border-[var(--cyan)] text-[var(--cyan)] bg-[var(--cyan-faint)]'
+                              : 'border-[var(--line)] text-[var(--text-3)] bg-[var(--surface)]'
+                          }`}
+                        >
+                          {(preferences.listenWakePhraseWhileTabOpen ?? false) ? 'STANDBY' : 'OFF'}
+                        </button>
+                      </div>
+
+                      {/* Remember Wake State */}
+                      <div className="flex items-center justify-between border-t border-[var(--line)] pt-3">
+                        <div className="space-y-0.5">
+                          <div className="font-hud tracking-wider text-[var(--text)]">
+                            REMEMBER WAKE STATE
+                          </div>
+                          <div className="font-mono text-[11px] text-[var(--text-3)]">
+                            Preserve active workshop state on reload (default OFF opens in Standby)
+                          </div>
+                        </div>
+                        <button
+                          onClick={() =>
+                            onUpdatePreferences({
+                              rememberWakeState: !(preferences.rememberWakeState ?? false),
+                            })
+                          }
+                          className={`px-3 py-1 font-hud tracking-widest text-xs border transition-all ${
+                            (preferences.rememberWakeState ?? false)
+                              ? 'border-[var(--cyan)] text-[var(--cyan)] bg-[var(--cyan-faint)]'
+                              : 'border-[var(--line)] text-[var(--text-3)] bg-[var(--surface)]'
+                          }`}
+                        >
+                          {(preferences.rememberWakeState ?? false) ? 'ACTIVE' : 'OFF'}
+                        </button>
+                      </div>
+
+                      {/* Test Voice Button */}
+                      <div className="border-t border-[var(--line)] pt-3 space-y-2">
+                        <button
+                          onClick={handleTestVoice}
+                          disabled={isTestingVoice}
+                          className="w-full flex items-center justify-center gap-2 py-2 px-3 border border-[var(--cyan)] bg-[var(--cyan-faint)] text-[var(--cyan)] font-hud text-xs tracking-widest hover:bg-[var(--cyan)] hover:text-black active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          <Play size={13} fill="currentColor" />
+                          {isTestingVoice ? 'TESTING PROTOCOL...' : 'TEST ACOUSTIC SYNTHESIS'}
+                        </button>
+
+                        {/* Replay Cinematic Boot Film Intro */}
+                        {onReplayIntro && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onClose()
+                              onReplayIntro()
+                            }}
+                            className="w-full flex items-center justify-center gap-2 py-2 px-3 border border-[var(--gold)] bg-[rgba(242,184,75,0.12)] text-[var(--gold)] font-hud text-xs tracking-widest hover:bg-[var(--gold)] hover:text-black active:scale-[0.98] transition-all cursor-pointer"
+                          >
+                            <Film size={13} />
+                            REPLAY INTRO (CINEMATIC BOOT FILM)
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </section>
 

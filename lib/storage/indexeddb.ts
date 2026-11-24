@@ -11,8 +11,20 @@ export const DEFAULT_PREFERENCES: UIPreferences = {
   maxContextMessages: 50,
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   readAloud: false,
+  autoSpeak: true,
   provider: 'gemini',
   model: 'gemini-2.0-flash',
+  voiceEnabled: true,
+  voiceProvider: 'cloud',
+  voiceRate: 0.98,
+  voicePitch: 0.85,
+  voiceVolume: 1.0,
+  voiceHolographicEffect: false,
+  bootChimeEnabled: true,
+  voiceAcknowledgements: true,
+  wakeWordEnabled: false,
+  rememberWakeState: false,
+  listenWakePhraseWhileTabOpen: false,
 }
 
 let customStore: any = null

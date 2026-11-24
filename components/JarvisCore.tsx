@@ -1,7 +1,7 @@
 "use client";
 import { memo } from "react";
 
-export type CoreState = "idle" | "listening" | "thinking" | "speaking";
+export type CoreState = "idle" | "listening" | "thinking" | "speaking" | "dormant";
 type Props = { size?: number; state?: CoreState; level?: number; label?: string; onClick?: () => void };
 
 const C = 250;

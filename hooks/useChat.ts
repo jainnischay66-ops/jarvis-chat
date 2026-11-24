@@ -9,6 +9,9 @@ interface UseChatProps {
   onUpdateConversation: (conv: Conversation) => Promise<void>
   preferences: UIPreferences
   onAutoTitle?: (conversationId: string, firstUserMessage: string) => void
+  onStreamChunk?: (chunk: string) => void
+  onStreamFinish?: () => void
+  onStreamAbort?: () => void
 }
 
 export function useChat({
@@ -16,6 +19,9 @@ export function useChat({
   onUpdateConversation,
   preferences,
   onAutoTitle,
+  onStreamChunk,
+  onStreamFinish,
+  onStreamAbort,
 }: UseChatProps) {
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
@@ -26,8 +32,9 @@ export function useChat({
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
+      onStreamAbort?.()
     }
-  }, [])
+  }, [onStreamAbort])
 
   const executeSend = useCallback(
     async (
@@ -104,6 +111,7 @@ export function useChat({
               if (chunk.type === 'text') {
                 accumulatedText += chunk.content
                 setStreamingContent(accumulatedText)
+                onStreamChunk?.(chunk.content)
               } else if (chunk.type === 'error') {
                 throw new Error(chunk.content)
               }
@@ -114,6 +122,8 @@ export function useChat({
             }
           }
         }
+
+        onStreamFinish?.()
 
         const assistantMsg: StoredMessage = {
           id: generateId(),

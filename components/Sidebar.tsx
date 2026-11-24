@@ -61,7 +61,7 @@ export function Sidebar({
   }
 
   const sidebarContent = (
-    <aside className="holo-brackets holo-scanlines w-[260px] h-full flex flex-col bg-[var(--surface)] border-r border-[var(--line)] select-none z-30">
+    <aside className="holo-brackets holo-scanlines w-[260px] h-full flex flex-col bg-[#050D18]/95 backdrop-blur-md border-r border-[var(--line)] select-none z-30">
       {/* Top Header: New Archive button (h-44, text 13px, hairline border, no brackets) */}
       <div className="p-4 flex items-center gap-2 border-b border-[var(--line)] safe-area-top">
         <button
