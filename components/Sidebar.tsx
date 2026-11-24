@@ -126,19 +126,27 @@ export function Sidebar({
               </div>
 
               <div className="space-y-1">
-                {group.conversations.map(c => {
+                {group.conversations.map((c, idx) => {
                   const isActive = c.id === currentId
                   const isEditingThis = editingId === c.id
 
                   return (
-                    <div
+                    <motion.div
                       key={c.id}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.25, delay: idx * 0.05, ease: [0.22, 1, 0.36, 1] }}
                       className={`group relative flex items-center justify-between h-[44px] px-4 text-xs transition-all border-l-2 ${
                         isActive
-                          ? 'border-[var(--gold)] text-[var(--gold)] sidebar-row-active font-medium'
+                          ? 'border-[var(--cyan)] text-[var(--cyan)] sidebar-row-active flow-border flow-active font-medium'
                           : 'border-transparent text-[var(--text-2)] hover:border-[var(--line)] hover:bg-[var(--surface-hi)]/50 hover:text-[var(--text)]'
                       }`}
                     >
+                      {/* Active conversation subtle cyan dot indicator */}
+                      {isActive && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)] mr-2 shrink-0 animate-pulse" />
+                      )}
+
                       {/* Pinned row tick marks */}
                       {c.pinned && (
                         <div
@@ -215,7 +223,7 @@ export function Sidebar({
                           </button>
                         </div>
                       )}
-                    </div>
+                    </motion.div>
                   )
                 })}
               </div>

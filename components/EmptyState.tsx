@@ -86,21 +86,26 @@ export function EmptyState({ onSuggestionClick, state = 'idle', level = 0 }: Emp
       {/* Suggestions: 2 columns, gap 12, width 100%, chamfer 10px, no brackets, no label, no dot */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-[760px] mt-2">
         {SUGGESTIONS.map((suggestion, idx) => (
-          <button
+          <motion.button
             key={suggestion}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16, transition: { duration: 0.25, delay: idx * 0.04 } }}
+            transition={{ duration: 0.35, delay: idx * 0.06, ease: [0.22, 1, 0.36, 1] }}
+            whileHover={{ y: -2 }}
             onClick={() => onSuggestionClick(suggestion)}
             style={{
               clipPath:
                 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)',
             }}
-            className={`suggestion-chip min-h-[52px] px-4 py-3 bg-[var(--surface)] hover:bg-[var(--surface-hi)] border border-[var(--line)] hover:border-[var(--cyan)] active:scale-[0.98] transition-all text-left flex items-center cursor-pointer ${
+            className={`suggestion-chip flow-border min-h-[52px] px-4 py-3 bg-[var(--surface)] hover:bg-[var(--surface-hi)] border border-[var(--line)] hover:border-transparent active:scale-[0.98] transition-all text-left flex items-center cursor-pointer ${
               idx >= 2 ? 'max-h-[560px]:hidden' : ''
             }`}
           >
             <span className="font-sans text-[14px] leading-[1.35] text-[var(--text)] line-clamp-2">
               {suggestion}
             </span>
-          </button>
+          </motion.button>
         ))}
       </div>
     </div>

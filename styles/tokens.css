@@ -49,6 +49,12 @@
   --radius-code: var(--chamfer);
   --radius-full: 9999px;
 
+  /* Flow Transition Tokens */
+  --ease-flow: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 200ms;
+  --dur-base: 350ms;
+  --dur-slow: 600ms;
+
   --max-w-chat: 720px;
   --width-sidebar: 260px;
 }

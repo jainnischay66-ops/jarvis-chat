@@ -208,7 +208,7 @@ export function Composer({
           setIsDragging(false)
           handleFileSelect(e.dataTransfer.files)
         }}
-        className="chamfer-card holo-brackets holo-scanlines composer-terminal min-h-[56px] p-2 bg-[var(--surface)] border border-[var(--line)] flex flex-col justify-center"
+        className="chamfer-card holo-brackets holo-scanlines composer-terminal flow-border min-h-[56px] p-2 bg-[var(--surface)] border border-[var(--line)] flex flex-col justify-center"
       >
         {/* Editing Banner */}
         {editingMessage && (

@@ -16,6 +16,8 @@ interface HudBackdropProps {
   messageCount?: number
   lastLatencyMs?: number | null
   isOnline?: boolean
+  panOffset?: number
+  isPanning?: boolean
 }
 
 const GLYPHS = [
@@ -31,6 +33,8 @@ export function HudBackdrop({
   messageCount = 0,
   lastLatencyMs = null,
   isOnline = true,
+  panOffset = 0,
+  isPanning = false,
 }: HudBackdropProps) {
   const [clock, setClock] = useState('00:00:00')
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
@@ -189,6 +193,9 @@ export function HudBackdrop({
     }
   }, [state])
 
+  const panSpinMultiplier = isPanning && !reducedMotion ? 3.0 : 1.0
+  const effectiveStateSpeed = stateSpeed * panSpinMultiplier
+
   // Parallax offsets
   const shiftP1 = { x: mousePos.x * 5, y: mousePos.y * 5 }
   const shiftP2 = { x: mousePos.x * 9, y: mousePos.y * 9 }
@@ -224,8 +231,8 @@ export function HudBackdrop({
           perspective: '600px',
           maskImage: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.15) 60%, transparent 100%)',
           WebkitMaskImage: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.15) 60%, transparent 100%)',
-          transform: `translate3d(${shiftP1.x}px, ${shiftP1.y}px, 0)`,
-          transition: 'transform 80ms ease-out',
+          transform: `translate3d(${shiftP1.x + panOffset * 0.4}px, ${shiftP1.y}px, 0)`,
+          transition: reducedMotion ? 'none' : 'transform 450ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       >
         <div
@@ -246,8 +253,8 @@ export function HudBackdrop({
       <div
         className="absolute inset-0 flex items-center justify-center pointer-events-none"
         style={{
-          transform: `translate3d(${shiftP2.x}px, ${shiftP2.y}px, 0) scale(${state === 'listening' ? 0.97 : 1})`,
-          transition: reducedMotion ? 'none' : 'transform 400ms cubic-bezier(0.16, 1, 0.3, 1)',
+          transform: `translate3d(${shiftP2.x + panOffset}px, ${shiftP2.y}px, 0) scale(${state === 'listening' ? 0.97 : 1})`,
+          transition: reducedMotion ? 'none' : 'transform 450ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       >
         <svg
@@ -294,7 +301,7 @@ export function HudBackdrop({
           <g
             className="hud-spin-clockwise"
             style={{
-              animationDuration: `${140 / stateSpeed}s`,
+              animationDuration: `${140 / effectiveStateSpeed}s`,
               animationPlayState: reducedMotion ? 'paused' : 'running',
             }}
           >
@@ -315,7 +322,7 @@ export function HudBackdrop({
           <g
             className="hud-spin-counter"
             style={{
-              animationDuration: `${200 / stateSpeed}s`,
+              animationDuration: `${200 / effectiveStateSpeed}s`,
               animationPlayState: reducedMotion ? 'paused' : 'running',
             }}
           >
@@ -350,7 +357,7 @@ export function HudBackdrop({
           <g
             className="hud-spin-clockwise"
             style={{
-              animationDuration: `${90 / stateSpeed}s`,
+              animationDuration: `${90 / effectiveStateSpeed}s`,
               animationPlayState: reducedMotion ? 'paused' : 'running',
             }}
           >
@@ -370,7 +377,7 @@ export function HudBackdrop({
           <g
             className="hud-spin-counter"
             style={{
-              animationDuration: `${240 / stateSpeed}s`,
+              animationDuration: `${240 / effectiveStateSpeed}s`,
               animationPlayState: reducedMotion ? 'paused' : 'running',
             }}
           >

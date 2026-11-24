@@ -363,6 +363,116 @@
   box-shadow: inset 0 0 14px rgba(242, 184, 75, 0.08);
 }
 
+/* 6. Flow Transition System: Iridescent Glow Border */
+@property --flow-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes rotateFlowAngle {
+  to {
+    --flow-angle: 360deg;
+  }
+}
+
+.flow-border {
+  --flow-angle: 0deg;
+  position: relative;
+}
+
+.flow-border::before {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--flow-angle),
+    #5CCBF5 0deg,
+    #0247FE 72deg,
+    #8A2BE2 144deg,
+    #FF007F 216deg,
+    #F2B84B 288deg,
+    #5CCBF5 360deg
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: rotateFlowAngle 7s linear infinite;
+  opacity: 0.4;
+  transition: opacity 300ms ease, filter 300ms ease;
+  z-index: 2;
+}
+
+.flow-border::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--flow-angle),
+    #5CCBF5 0deg,
+    #0247FE 72deg,
+    #8A2BE2 144deg,
+    #FF007F 216deg,
+    #F2B84B 288deg,
+    #5CCBF5 360deg
+  );
+  filter: blur(14px);
+  opacity: 0.25;
+  pointer-events: none;
+  animation: rotateFlowAngle 7s linear infinite;
+  transition: opacity 300ms ease, filter 300ms ease;
+  z-index: -1;
+}
+
+/* Hover, Focus, or Active state */
+.flow-border:hover::before,
+.flow-border:focus-within::before,
+.flow-border.flow-active::before {
+  opacity: 0.85;
+  animation-duration: 3.5s;
+}
+
+.flow-border:hover::after,
+.flow-border:focus-within::after,
+.flow-border.flow-active::after {
+  opacity: 0.45;
+  filter: blur(16px);
+  animation-duration: 3.5s;
+}
+
+/* Shimmer settle after streaming finishes */
+@keyframes holoShimmerSettle {
+  0% {
+    box-shadow: 0 0 24px rgba(242, 184, 75, 0.5), inset 0 0 16px rgba(92, 203, 245, 0.3);
+    border-color: rgba(242, 184, 75, 0.8);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(92, 203, 245, 0.4), inset 0 0 12px rgba(92, 203, 245, 0.2);
+    border-color: rgba(92, 203, 245, 0.6);
+  }
+  100% {
+    box-shadow: inset 0 0 18px rgba(92, 203, 245, 0.06), 0 8px 32px rgba(0, 0, 0, 0.35);
+    border-color: rgba(92, 203, 245, 0.28);
+  }
+}
+
+.holo-shimmer-settle {
+  animation: holoShimmerSettle 600ms var(--ease-flow) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-border::before,
+  .flow-border::after,
+  .holo-shimmer-settle {
+    animation: none !important;
+  }
+}
+
 [data-holo="false"] .holo-brackets::before,
 [data-holo="false"] .reactor-spin-slow,
 [data-holo="false"] .reactor-spin-rev,

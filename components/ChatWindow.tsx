@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useStorage } from '@/hooks/useStorage'
 import { useChat } from '@/hooks/useChat'
 import { useScrollAnchor } from '@/hooks/useScrollAnchor'
@@ -30,6 +31,21 @@ export default function ChatWindow() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null)
   const sendTimeRef = useRef<number | null>(null)
+
+  const [panDirection, setPanDirection] = useState<number>(1)
+  const [isPanning, setIsPanning] = useState<boolean>(false)
+  const [reducedMotion, setReducedMotion] = useState<boolean>(false)
+  const prevConversationIdRef = useRef<string | null>(null)
+
+  // Track prefers-reduced-motion
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    setReducedMotion(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   // On mobile screens, start with sidebar closed so chat is immediately visible
   useEffect(() => {
@@ -61,6 +77,31 @@ export default function ChatWindow() {
     importData,
     clearAllData,
   } = useStorage()
+
+  // Track camera-pan direction when switching conversations
+  useEffect(() => {
+    const currentId = currentConversation?.id || null
+    const prevId = prevConversationIdRef.current
+    if (prevId !== currentId) {
+      if (!currentId) {
+        setPanDirection(1)
+      } else if (prevId) {
+        const prevIdx = conversations.findIndex(c => c.id === prevId)
+        const currIdx = conversations.findIndex(c => c.id === currentId)
+        if (prevIdx !== -1 && currIdx !== -1) {
+          setPanDirection(currIdx > prevIdx ? -1 : 1)
+        } else {
+          setPanDirection(1)
+        }
+      } else {
+        setPanDirection(1)
+      }
+      prevConversationIdRef.current = currentId
+      setIsPanning(true)
+      const timer = setTimeout(() => setIsPanning(false), 500)
+      return () => clearTimeout(timer)
+    }
+  }, [currentConversation?.id, conversations])
 
   // Auto-generate title after the first exchange
   const handleAutoTitle = useCallback(
@@ -312,6 +353,8 @@ export default function ChatWindow() {
         messageCount={currentConversation?.messages?.length || 0}
         lastLatencyMs={lastLatencyMs}
         isOnline={isOnline}
+        panOffset={isPanning ? panDirection * -24 : 0}
+        isPanning={isPanning}
       />
 
       {/* Offline banner */}
@@ -371,32 +414,87 @@ export default function ChatWindow() {
             </div>
           )}
 
-          <div
-            className={`column w-full max-w-[760px] mx-auto px-4 min-h-full flex flex-col ${
-              hasMessages ? 'justify-start' : 'justify-center'
-            }`}
-          >
-            <MessageList
-              messages={currentConversation?.messages || []}
-              streamingContent={streamingContent}
-              isStreaming={isStreaming}
-              onCopy={handleCopy}
-              onRegenerate={regenerate}
-              onEdit={(id, content) => setEditingMessage({ id, content })}
-              onReadAloud={content => {
-                if (isSpeaking) {
-                  stopSpeaking()
-                } else {
-                  speak(content)
-                }
+          <AnimatePresence mode="popLayout" custom={panDirection} initial={false}>
+            <motion.div
+              key={currentConversation?.id || 'empty-stage'}
+              custom={panDirection}
+              variants={{
+                enter: (dir: number) =>
+                  reducedMotion
+                    ? { opacity: 0, x: 0, scale: 1, filter: 'none' }
+                    : {
+                        x: dir > 0 ? '8%' : '-8%',
+                        scale: 0.98,
+                        opacity: 0,
+                        filter: 'blur(4px)',
+                      },
+                center: reducedMotion
+                  ? {
+                      opacity: 1,
+                      x: 0,
+                      scale: 1,
+                      filter: 'none',
+                      transition: { duration: 0.15 },
+                    }
+                  : {
+                      x: '0%',
+                      scale: 1,
+                      opacity: 1,
+                      filter: 'blur(0px)',
+                      transition: {
+                        duration: 0.45,
+                        ease: [0.22, 1, 0.36, 1],
+                      },
+                    },
+                exit: (dir: number) =>
+                  reducedMotion
+                    ? {
+                        opacity: 0,
+                        x: 0,
+                        scale: 1,
+                        filter: 'none',
+                        transition: { duration: 0.15 },
+                      }
+                    : {
+                        x: dir > 0 ? '-8%' : '8%',
+                        scale: 0.96,
+                        opacity: 0,
+                        filter: 'blur(4px)',
+                        transition: {
+                          duration: 0.45,
+                          ease: [0.22, 1, 0.36, 1],
+                        },
+                      },
               }}
-              isReading={isSpeaking}
-              onSuggestionClick={prompt => handleSendMessage(prompt)}
-              scrollContainerRef={scrollContainerRef}
-              state={coreState}
-              level={coreLevel}
-            />
-          </div>
+              initial="enter"
+              animate="center"
+              exit="exit"
+              className={`column w-full max-w-[760px] mx-auto px-4 min-h-full flex flex-col ${
+                hasMessages ? 'justify-start' : 'justify-center'
+              }`}
+            >
+              <MessageList
+                messages={currentConversation?.messages || []}
+                streamingContent={streamingContent}
+                isStreaming={isStreaming}
+                onCopy={handleCopy}
+                onRegenerate={regenerate}
+                onEdit={(id, content) => setEditingMessage({ id, content })}
+                onReadAloud={content => {
+                  if (isSpeaking) {
+                    stopSpeaking()
+                  } else {
+                    speak(content)
+                  }
+                }}
+                isReading={isSpeaking}
+                onSuggestionClick={prompt => handleSendMessage(prompt)}
+                scrollContainerRef={scrollContainerRef}
+                state={coreState}
+                level={coreLevel}
+              />
+            </motion.div>
+          </AnimatePresence>
 
           {/* Scroll to Bottom Button */}
           <ScrollToBottom

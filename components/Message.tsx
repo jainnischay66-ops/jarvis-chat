@@ -42,9 +42,9 @@ export const Message = memo(function Message({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 34 }}
+      initial={{ opacity: 0, y: isUser ? 24 : 8, scale: isUser ? 0.98 : 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: isUser ? 0.28 : 0.4, ease: [0.22, 1, 0.36, 1] }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={`group relative flex flex-col w-full ${isUser ? 'items-end' : 'items-start'} mb-6`}
@@ -109,7 +109,13 @@ export const Message = memo(function Message({
           </div>
 
           {/* Floating holo panel container */}
-          <div className="holo-assistant-panel holo-materialize p-4 w-full">
+          <div
+            className={`holo-assistant-panel p-4 w-full transition-all duration-300 ${
+              isStreaming
+                ? 'flow-border flow-active'
+                : 'holo-materialize holo-shimmer-settle'
+            }`}
+          >
             {/* Header: J.A.R.V.I.S. with live timestamp in mono */}
             <div className="flex items-center justify-between w-full mb-2.5 select-none border-b border-[var(--line)] pb-1.5">
               <div className="flex items-center gap-2.5">
