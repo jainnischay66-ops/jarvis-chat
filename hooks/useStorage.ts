@@ -248,9 +248,13 @@ export function useStorage() {
     const startOfYesterday = startOfToday - 86400000
     const startOf7Days = startOfToday - 6 * 86400000
 
+    const seenIds = new Set<string>()
+
     conversations.forEach(c => {
-      // Never display empty conversations in sidebar groups
+      // Never display empty conversations or duplicate items in sidebar groups
       if (!c.messages || c.messages.length === 0) return
+      if (seenIds.has(c.id)) return
+      seenIds.add(c.id)
 
       if (c.pinned) {
         pinned.push(c)

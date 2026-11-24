@@ -234,12 +234,13 @@ export default function ChatWindow() {
     fetch('/api/chat')
       .then(r => r.json())
       .then(data => {
-        if (data.status) {
-          setConfigStatus(data.status)
-          if (data.status.provider && data.status.configured) {
+        const status = data.status || data
+        if (status) {
+          setConfigStatus(status)
+          if (status.provider && status.configured) {
             updatePreferences({
-              provider: data.status.provider,
-              model: data.status.model,
+              provider: status.provider,
+              model: status.model,
             })
           }
         }
@@ -345,18 +346,6 @@ export default function ChatWindow() {
         sidebarOpen ? '' : 'sidebar-closed'
       }`}
     >
-      {/* Living Holographic HUD Backdrop: concentric rotating rings, particle dust, perspective grid floor */}
-      <HudBackdrop
-        state={coreState}
-        level={coreLevel}
-        hasMessages={hasMessages}
-        messageCount={currentConversation?.messages?.length || 0}
-        lastLatencyMs={lastLatencyMs}
-        isOnline={isOnline}
-        panOffset={isPanning ? panDirection * -24 : 0}
-        isPanning={isPanning}
-      />
-
       {/* Offline banner */}
       {!isOnline && (
         <div className="fixed top-0 inset-x-0 z-50 bg-[var(--red)] text-white text-center py-1 font-hud text-xs tracking-wider">
@@ -379,6 +368,19 @@ export default function ChatWindow() {
 
       {/* Main Chat Area (col 2 of .app grid): 3 rows: TopBar (56px), Scroll (minmax(0, 1fr)), Composer (auto) */}
       <main className="main h-full min-h-0 min-w-0 relative z-10 overflow-hidden">
+        {/* Living Holographic HUD Backdrop: placed INSIDE .main so center is chat center and bounds are clipped */}
+        <HudBackdrop
+          state={coreState}
+          level={coreLevel}
+          hasMessages={hasMessages}
+          messageCount={currentConversation?.messages?.length || 0}
+          lastLatencyMs={lastLatencyMs}
+          isOnline={isOnline}
+          panOffset={isPanning ? panDirection * -24 : 0}
+          isPanning={isPanning}
+          composerHeight={80}
+        />
+
         {/* Row 1: Top Bar (56px) */}
         <TopBar
           title={currentTitle}
@@ -469,8 +471,10 @@ export default function ChatWindow() {
               initial="enter"
               animate="center"
               exit="exit"
-              className={`column w-full max-w-[760px] mx-auto px-4 min-h-full flex flex-col ${
-                hasMessages ? 'justify-start' : 'justify-center'
+              className={`column w-full max-w-[760px] mx-auto px-4 min-h-full flex flex-col relative z-10 ${
+                hasMessages
+                  ? 'justify-start backdrop-blur-[2px] bg-gradient-to-b from-transparent via-[rgba(2,4,10,0.55)] to-transparent'
+                  : 'justify-center'
               }`}
             >
               <MessageList
@@ -492,6 +496,8 @@ export default function ChatWindow() {
                 scrollContainerRef={scrollContainerRef}
                 state={coreState}
                 level={coreLevel}
+                error={chatError}
+                onRetry={retry}
               />
             </motion.div>
           </AnimatePresence>

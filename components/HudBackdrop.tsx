@@ -18,6 +18,7 @@ interface HudBackdropProps {
   isOnline?: boolean
   panOffset?: number
   isPanning?: boolean
+  composerHeight?: number
 }
 
 const GLYPHS = [
@@ -35,12 +36,37 @@ export function HudBackdrop({
   isOnline = true,
   panOffset = 0,
   isPanning = false,
+  composerHeight = 76,
 }: HudBackdropProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [containerSize, setContainerSize] = useState({ width: 1200, height: 800 })
   const [clock, setClock] = useState('00:00:00')
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
   const [reducedMotion, setReducedMotion] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [isDebug, setIsDebug] = useState(false)
+
+  // Measure container dimensions using ResizeObserver
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect
+        if (width > 0 && height > 0) {
+          setContainerSize({ width, height })
+        }
+      }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // Check ?debug=1 in query params
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      setIsDebug(params.get('debug') === '1')
+    }
+  }, [])
 
   // Live telemetry clock
   useEffect(() => {
@@ -54,132 +80,17 @@ export function HudBackdrop({
     return () => clearInterval(timer)
   }, [])
 
-  // Check prefers-reduced-motion and touch / mobile
+  // Check prefers-reduced-motion
   useEffect(() => {
     if (typeof window === 'undefined') return
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
     setReducedMotion(mq.matches)
     const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches)
     mq.addEventListener('change', handler)
-
-    setIsMobile(window.innerWidth < 768 || 'ontouchstart' in window)
-
-    const onResize = () => {
-      setIsMobile(window.innerWidth < 768 || 'ontouchstart' in window)
-    }
-    window.addEventListener('resize', onResize)
-
-    return () => {
-      mq.removeEventListener('change', handler)
-      window.removeEventListener('resize', onResize)
-    }
+    return () => mq.removeEventListener('change', handler)
   }, [])
 
-  // Mouse parallax tracking
-  useEffect(() => {
-    if (reducedMotion || isMobile) return
-
-    let rafId: number
-    let targetX = 0
-    let targetY = 0
-    let currentX = 0
-    let currentY = 0
-
-    const onMouseMove = (e: MouseEvent) => {
-      const { innerWidth, innerHeight } = window
-      targetX = (e.clientX / innerWidth - 0.5) * 2 // -1 to 1
-      targetY = (e.clientY / innerHeight - 0.5) * 2 // -1 to 1
-    }
-
-    const loop = () => {
-      currentX += (targetX - currentX) * 0.05
-      currentY += (targetY - currentY) * 0.05
-      setMousePos({ x: currentX, y: currentY })
-      rafId = requestAnimationFrame(loop)
-    }
-
-    window.addEventListener('mousemove', onMouseMove, { passive: true })
-    rafId = requestAnimationFrame(loop)
-
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove)
-      cancelAnimationFrame(rafId)
-    }
-  }, [reducedMotion, isMobile])
-
-  // Canvas floating particle dust (lightweight 2D embers)
-  useEffect(() => {
-    if (reducedMotion || isMobile) return
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    let animId: number
-    let width = (canvas.width = window.innerWidth)
-    let height = (canvas.height = window.innerHeight)
-
-    const handleResize = () => {
-      if (!canvas) return
-      width = canvas.width = window.innerWidth
-      height = canvas.height = window.innerHeight
-    }
-    window.addEventListener('resize', handleResize)
-
-    // Generate 32 particles
-    const count = 32
-    const particles = Array.from({ length: count }, () => ({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      size: Math.random() * 1.5 + 0.8,
-      speedY: -(Math.random() * 0.4 + 0.15),
-      speedX: (Math.random() - 0.5) * 0.2,
-      opacity: Math.random() * 0.4 + 0.1,
-      gold: Math.random() > 0.7,
-      pulse: Math.random() * Math.PI * 2,
-    }))
-
-    const render = () => {
-      if (document.hidden) {
-        animId = requestAnimationFrame(render)
-        return
-      }
-      ctx.clearRect(0, 0, width, height)
-
-      particles.forEach(p => {
-        p.y += p.speedY
-        p.x += p.speedX
-        p.pulse += 0.02
-        if (p.y < -10) {
-          p.y = height + 10
-          p.x = Math.random() * width
-        }
-        if (p.x < -10) p.x = width + 10
-        if (p.x > width + 10) p.x = -10
-
-        const currentOpacity = p.opacity * (0.7 + 0.3 * Math.sin(p.pulse))
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
-        ctx.fillStyle = p.gold
-          ? `rgba(242, 184, 75, ${currentOpacity})`
-          : `rgba(92, 203, 245, ${currentOpacity})`
-        ctx.shadowBlur = 4
-        ctx.shadowColor = p.gold ? '#F2B84B' : '#5CCBF5'
-        ctx.fill()
-      })
-
-      animId = requestAnimationFrame(render)
-    }
-
-    animId = requestAnimationFrame(render)
-
-    return () => {
-      window.removeEventListener('resize', handleResize)
-      cancelAnimationFrame(animId)
-    }
-  }, [reducedMotion, isMobile])
-
-  // State-driven multipliers for ring animation speed & intensity
+  // Ring speed multiplier
   const stateSpeed = useMemo(() => {
     switch (state) {
       case 'thinking':
@@ -196,42 +107,38 @@ export function HudBackdrop({
   const panSpinMultiplier = isPanning && !reducedMotion ? 3.0 : 1.0
   const effectiveStateSpeed = stateSpeed * panSpinMultiplier
 
-  // Parallax offsets
-  const shiftP1 = { x: mousePos.x * 5, y: mousePos.y * 5 }
-  const shiftP2 = { x: mousePos.x * 9, y: mousePos.y * 9 }
-  const shiftP3 = { x: mousePos.x * 14, y: mousePos.y * 14 }
+  // Size rings from container's shorter side
+  const minSide = Math.min(containerSize.width, containerSize.height)
+  const ringScale = Math.min(1.0, Math.max(0.38, minSide / 850))
 
   return (
     <div
+      id="hud-backdrop-root"
+      ref={containerRef}
       aria-hidden="true"
-      className="fixed inset-0 pointer-events-none select-none overflow-hidden z-0 bg-[var(--bg)]"
+      className="absolute inset-0 overflow-hidden z-0 pointer-events-none select-none bg-[var(--bg)]"
     >
       {/* 1. Deep radial lighting haze: central cyan halo + core gold glow */}
       <div
         className="absolute inset-0 pointer-events-none transition-opacity duration-700"
         style={{
           background: `
-            radial-gradient(circle 420px at 50% 50%, rgba(92, 203, 245, ${state === 'listening' ? 0.08 : 0.045}) 0%, transparent 70%),
-            radial-gradient(circle 240px at 50% 50%, rgba(242, 184, 75, ${state === 'thinking' ? 0.12 : state === 'speaking' ? 0.09 : 0.035}) 0%, transparent 60%),
+            radial-gradient(circle ${minSide * 0.45}px at 50% 50%, rgba(92, 203, 245, ${state === 'listening' ? 0.08 : 0.045}) 0%, transparent 70%),
+            radial-gradient(circle ${minSide * 0.25}px at 50% 50%, rgba(242, 184, 75, ${state === 'thinking' ? 0.12 : state === 'speaking' ? 0.09 : 0.035}) 0%, transparent 60%),
             radial-gradient(ellipse at center, transparent 40%, rgba(2, 4, 10, 0.75) 100%)
           `,
         }}
       />
 
-      {/* 2. Floating Particle Dust Layer */}
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 pointer-events-none opacity-60"
-      />
-
-      {/* 3. Perspective Holographic Grid Floor at bottom */}
+      {/* 2. Perspective Holographic Grid Floor at bottom */}
       <div
+        id="hud-grid-floor"
         className="absolute bottom-0 inset-x-0 h-[38vh] pointer-events-none overflow-hidden"
         style={{
           perspective: '600px',
           maskImage: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.15) 60%, transparent 100%)',
           WebkitMaskImage: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.15) 60%, transparent 100%)',
-          transform: `translate3d(${shiftP1.x + panOffset * 0.4}px, ${shiftP1.y}px, 0)`,
+          transform: `translate3d(${panOffset * 0.4}px, 0, 0)`,
           transition: reducedMotion ? 'none' : 'transform 450ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       >
@@ -249,17 +156,21 @@ export function HudBackdrop({
         />
       </div>
 
-      {/* 4. Giant Concentric Holographic HUD Rings (SVG) */}
+      {/* 3. Giant Concentric Holographic HUD Rings (SVG) */}
       <div
-        className="absolute inset-0 flex items-center justify-center pointer-events-none"
+        className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-700 ${
+          hasMessages ? 'opacity-25' : 'opacity-85'
+        }`}
         style={{
-          transform: `translate3d(${shiftP2.x + panOffset}px, ${shiftP2.y}px, 0) scale(${state === 'listening' ? 0.97 : 1})`,
+          transform: `translate3d(${panOffset}px, 0, 0) scale(${state === 'listening' ? 0.97 : 1})`,
           transition: reducedMotion ? 'none' : 'transform 450ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       >
         <svg
+          id="hud-rings-svg"
           viewBox="-600 -600 1200 1200"
-          className={`w-[1200px] h-[1200px] max-w-none transition-all duration-500 ${
+          preserveAspectRatio="xMidYMid slice"
+          className={`w-full h-full transition-all duration-500 ${
             state === 'error' ? 'hud-error-flicker' : ''
           }`}
           style={{
@@ -267,7 +178,6 @@ export function HudBackdrop({
           }}
         >
           <defs>
-            {/* Outward pulse ripple gradient */}
             <radialGradient id="hudRippleGrad" cx="50%" cy="50%" r="50%">
               <stop offset="70%" stopColor="#5CCBF5" stopOpacity="0.25" />
               <stop offset="100%" stopColor="#5CCBF5" stopOpacity="0" />
@@ -284,221 +194,260 @@ export function HudBackdrop({
             </filter>
           </defs>
 
-          {/* Ring 1 (Inner continuous circle with 4 crosshair ticks, R = 180) */}
-          <circle
-            r="180"
-            fill="none"
-            stroke="rgba(92, 203, 245, 0.22)"
-            strokeWidth="1"
-            strokeDasharray="4 6"
-          />
-          <line x1="-190" y1="0" x2="-170" y2="0" stroke="#5CCBF5" strokeWidth="1.5" />
-          <line x1="170" y1="0" x2="190" y2="0" stroke="#5CCBF5" strokeWidth="1.5" />
-          <line x1="0" y1="-190" x2="0" y2="-170" stroke="#5CCBF5" strokeWidth="1.5" />
-          <line x1="0" y1="170" x2="0" y2="190" stroke="#5CCBF5" strokeWidth="1.5" />
-
-          {/* Ring 2: Segmented arcs with gaps (R = 270), rotates clockwise */}
-          <g
-            className="hud-spin-clockwise"
-            style={{
-              animationDuration: `${140 / effectiveStateSpeed}s`,
-              animationPlayState: reducedMotion ? 'paused' : 'running',
-            }}
-          >
+          {/* Group scaled from container's shorter side */}
+          <g transform={`scale(${ringScale})`}>
+            {/* Ring 1 (Inner continuous circle with 4 crosshair ticks, R = 180) */}
             <circle
-              r="270"
+              r="180"
               fill="none"
-              stroke="#5CCBF5"
-              strokeWidth="1.5"
-              strokeDasharray="180 40 90 50 240 60"
-              opacity="0.45"
+              stroke="rgba(92, 203, 245, 0.22)"
+              strokeWidth="1"
+              strokeDasharray="4 6"
             />
-            {/* Glowing endpoint dots */}
-            <circle cx="270" cy="0" r="2.5" fill="#5CCBF5" filter="url(#hudGlow)" />
-            <circle cx="-270" cy="0" r="2.5" fill="#5CCBF5" filter="url(#hudGlow)" />
-          </g>
+            <line x1="-190" y1="0" x2="-170" y2="0" stroke="#5CCBF5" strokeWidth="1.5" />
+            <line x1="170" y1="0" x2="190" y2="0" stroke="#5CCBF5" strokeWidth="1.5" />
+            <line x1="0" y1="-190" x2="0" y2="-170" stroke="#5CCBF5" strokeWidth="1.5" />
+            <line x1="0" y1="170" x2="0" y2="190" stroke="#5CCBF5" strokeWidth="1.5" />
 
-          {/* Ring 3: Bezel dial tick marks (R = 360, 60 ticks), counter-clockwise */}
-          <g
-            className="hud-spin-counter"
-            style={{
-              animationDuration: `${200 / effectiveStateSpeed}s`,
-              animationPlayState: reducedMotion ? 'paused' : 'running',
-            }}
-          >
-            {Array.from({ length: 48 }).map((_, i) => {
-              const angle = (i * 360) / 48
-              const isMajor = i % 4 === 0
-              const isCardinal = i % 12 === 0
-              const r1 = 356
-              const r2 = isCardinal ? 372 : isMajor ? 368 : 362
-              const rad = (angle * Math.PI) / 180
-              const x1 = Math.cos(rad) * r1
-              const y1 = Math.sin(rad) * r1
-              const x2 = Math.cos(rad) * r2
-              const y2 = Math.sin(rad) * r2
+            {/* Ring 2: Segmented arcs with gaps (R = 270), rotates clockwise */}
+            <g
+              className="hud-spin-clockwise"
+              style={{
+                animationDuration: `${140 / effectiveStateSpeed}s`,
+                animationPlayState: reducedMotion ? 'paused' : 'running',
+              }}
+            >
+              <circle
+                r="270"
+                fill="none"
+                stroke="#5CCBF5"
+                strokeWidth="1.5"
+                strokeDasharray="180 40 90 50 240 60"
+                opacity="0.45"
+              />
+              <circle cx="270" cy="0" r="2.5" fill="#5CCBF5" filter="url(#hudGlow)" />
+              <circle cx="-270" cy="0" r="2.5" fill="#5CCBF5" filter="url(#hudGlow)" />
+            </g>
 
-              return (
-                <line
-                  key={`tick-${i}`}
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
-                  stroke={isCardinal ? '#F2B84B' : '#5CCBF5'}
-                  strokeWidth={isCardinal ? 2 : isMajor ? 1.5 : 1}
-                  opacity={isCardinal ? 0.75 : isMajor ? 0.5 : 0.25}
-                />
-              )
-            })}
-          </g>
+            {/* Ring 3: Bezel dial tick marks (R = 360, 48 ticks), counter-clockwise */}
+            <g
+              className="hud-spin-counter"
+              style={{
+                animationDuration: `${200 / effectiveStateSpeed}s`,
+                animationPlayState: reducedMotion ? 'paused' : 'running',
+              }}
+            >
+              {Array.from({ length: 48 }).map((_, i) => {
+                const angle = (i * 360) / 48
+                const isMajor = i % 4 === 0
+                const isCardinal = i % 12 === 0
+                const r1 = 356
+                const r2 = isCardinal ? 372 : isMajor ? 368 : 362
+                const rad = (angle * Math.PI) / 180
+                const x1 = Math.cos(rad) * r1
+                const y1 = Math.sin(rad) * r1
+                const x2 = Math.cos(rad) * r2
+                const y2 = Math.sin(rad) * r2
 
-          {/* Ring 4: Thick broken gold arc (R = 440), clockwise with smooth glow */}
-          <g
-            className="hud-spin-clockwise"
-            style={{
-              animationDuration: `${90 / effectiveStateSpeed}s`,
-              animationPlayState: reducedMotion ? 'paused' : 'running',
-            }}
-          >
+                return (
+                  <line
+                    key={`tick-${i}`}
+                    x1={x1}
+                    y1={y1}
+                    x2={x2}
+                    y2={y2}
+                    stroke={isCardinal ? '#F2B84B' : '#5CCBF5'}
+                    strokeWidth={isCardinal ? 2 : isMajor ? 1.5 : 1}
+                    opacity={isCardinal ? 0.75 : isMajor ? 0.5 : 0.25}
+                  />
+                )
+              })}
+            </g>
+
+            {/* Ring 4: Thick broken gold arc (R = 440), clockwise with smooth glow */}
+            <g
+              className="hud-spin-clockwise"
+              style={{
+                animationDuration: `${90 / effectiveStateSpeed}s`,
+                animationPlayState: reducedMotion ? 'paused' : 'running',
+              }}
+            >
+              <circle
+                r="440"
+                fill="none"
+                stroke="url(#hudGoldGrad)"
+                strokeWidth="2.5"
+                strokeDasharray="220 500 120 400"
+                strokeLinecap="round"
+                opacity={state === 'thinking' || state === 'speaking' ? 0.85 : 0.55}
+                filter="url(#hudGlow)"
+              />
+            </g>
+
+            {/* Ring 5: Rotating ring of technical glyphs / hex telemetry (R = 510) - Opacity reduced to 16% */}
+            <g
+              className="hud-spin-counter"
+              style={{
+                animationDuration: `${240 / effectiveStateSpeed}s`,
+                animationPlayState: reducedMotion ? 'paused' : 'running',
+              }}
+            >
+              <circle
+                r="510"
+                fill="none"
+                stroke="rgba(92, 203, 245, 0.16)"
+                strokeWidth="1"
+                strokeDasharray="2 8"
+              />
+              {GLYPHS.map((glyph, i) => {
+                const angle = (i * 360) / GLYPHS.length
+                const rad = (angle * Math.PI) / 180
+                const x = Math.cos(rad) * 510
+                const y = Math.sin(rad) * 510
+
+                return (
+                  <text
+                    key={`glyph-${i}`}
+                    x={x}
+                    y={y}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    transform={`rotate(${angle + 90}, ${x}, ${y})`}
+                    className="font-mono text-[9px] tracking-widest uppercase select-none"
+                    style={{ fill: 'rgba(92, 203, 245, 0.16)' }}
+                  >
+                    {glyph}
+                  </text>
+                )
+              })}
+            </g>
+
+            {/* Ring 6: Concentric micro-dashed ring (R = 580) */}
             <circle
-              r="440"
-              fill="none"
-              stroke="url(#hudGoldGrad)"
-              strokeWidth="2.5"
-              strokeDasharray="220 500 120 400"
-              strokeLinecap="round"
-              opacity={state === 'thinking' || state === 'speaking' ? 0.85 : 0.55}
-              filter="url(#hudGlow)"
-            />
-          </g>
-
-          {/* Ring 5: Rotating ring of technical glyphs / hex telemetry (R = 510) */}
-          <g
-            className="hud-spin-counter"
-            style={{
-              animationDuration: `${240 / effectiveStateSpeed}s`,
-              animationPlayState: reducedMotion ? 'paused' : 'running',
-            }}
-          >
-            <circle
-              r="510"
+              r="580"
               fill="none"
               stroke="rgba(92, 203, 245, 0.16)"
               strokeWidth="1"
-              strokeDasharray="2 4"
+              strokeDasharray="8 8 32 8"
             />
-            {GLYPHS.map((glyph, idx) => {
-              const angle = (idx * 360) / GLYPHS.length
-              const rad = (angle * Math.PI) / 180
-              const x = Math.cos(rad) * 510
-              const y = Math.sin(rad) * 510
 
-              return (
-                <text
-                  key={glyph}
-                  x={x}
-                  y={y}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  transform={`rotate(${angle + 90}, ${x}, ${y})`}
-                  className="font-mono text-[9px] fill-[var(--text-3)] tracking-widest uppercase select-none"
-                  style={{ fill: 'rgba(92, 203, 245, 0.45)' }}
-                >
-                  {glyph}
-                </text>
-              )
-            })}
+            {/* Ring 7: Giant outer perimeter ring (R = 680) */}
+            <circle
+              r="680"
+              fill="none"
+              stroke="rgba(92, 203, 245, 0.12)"
+              strokeWidth="1.5"
+              strokeDasharray="40 12 120 16 300 30"
+            />
+
+            {/* Outward pulse ripple */}
+            <circle
+              r="120"
+              className="hud-pulse-ripple"
+              fill="none"
+              stroke="#5CCBF5"
+              strokeWidth="1.5"
+              opacity="0.25"
+            />
           </g>
-
-          {/* Ring 6: Concentric micro-dashed ring with precision clusters (R = 580) */}
-          <circle
-            r="580"
-            fill="none"
-            stroke="rgba(92, 203, 245, 0.2)"
-            strokeWidth="1"
-            strokeDasharray="8 8 32 8"
-          />
-
-          {/* Ring 7: Giant outer perimeter ring (R = 680), partly extending off-screen */}
-          <circle
-            r="680"
-            fill="none"
-            stroke="rgba(92, 203, 245, 0.12)"
-            strokeWidth="1.5"
-            strokeDasharray="40 12 120 16 300 30"
-          />
-
-          {/* Dynamic outward traveling pulse ripple */}
-          <circle
-            r="120"
-            className="hud-pulse-ripple"
-            fill="none"
-            stroke="#5CCBF5"
-            strokeWidth="1.5"
-            opacity="0.3"
-          />
         </svg>
       </div>
 
-      {/* 5. Center 3D Background Orb (enlarged, dimmed behind messages) */}
-      {hasMessages && (
+      {/* 4. R3F Canvas 3D Orb (Concentric at Center, supporting opacity in chat mode) */}
+      <div
+        id="hud-orb-canvas"
+        className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-700 ${
+          hasMessages ? 'opacity-25' : 'opacity-100'
+        }`}
+        style={{
+          transform: `translate3d(${panOffset}px, 0, 0)`,
+          transition: reducedMotion ? 'none' : 'transform 450ms cubic-bezier(0.22, 1, 0.36, 1)',
+        }}
+      >
         <div
-          className="absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-700"
+          className="relative flex items-center justify-center"
           style={{
-            opacity: state === 'thinking' ? 0.4 : state === 'speaking' ? 0.35 : 0.28,
-            transform: `translate3d(${shiftP3.x}px, ${shiftP3.y}px, 0) scale(1.4)`,
+            width: Math.min(containerSize.width, containerSize.height * 0.9, 720),
+            height: Math.min(containerSize.width, containerSize.height * 0.9, 720),
+            maxWidth: '100%',
+            maxHeight: '100%',
           }}
         >
-          <div className="w-[480px] h-[480px] max-w-[90vw] max-h-[90vh]">
-            <JarvisOrb state={state === 'error' ? 'idle' : state} level={level} />
-          </div>
-        </div>
-      )}
-
-      {/* 6. Slow Vertical Scan-Sweep Laser Line */}
-      {!reducedMotion && (
-        <div className="hud-scan-sweep pointer-events-none" />
-      )}
-
-      {/* 7. Subtle Corner HUD Telemetry (Real data only) */}
-      <div className="absolute inset-0 p-3 pointer-events-none flex flex-col justify-between text-[11px] font-mono select-none text-[var(--text-3)] z-10">
-        {/* Top telemetry line - positioned cleanly below TopBar (56px) and clearing desktop sidebar */}
-        <div className="flex items-center justify-between w-full pl-4 md:pl-[276px] pr-4 pt-[64px] opacity-75">
-          <div className="flex items-center gap-3">
-            <span className="text-[var(--cyan)] font-semibold tracking-wider">HUD.v7.4</span>
-            <span className="hidden sm:inline text-[var(--line)]">|</span>
-            <span className="hidden sm:inline text-[var(--text-3)]">{clock}</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline">CORE_FREQ: 432.8 THz</span>
-            <span className="hidden sm:inline text-[var(--line)]">|</span>
-            <span className={isOnline ? 'text-[var(--cyan)]' : 'text-[var(--red)]'}>
-              SYS: {isOnline ? 'NOMINAL' : 'OFFLINE'}
-            </span>
-          </div>
-        </div>
-
-        {/* Bottom telemetry line - positioned above bottom screen edge and clearing desktop sidebar */}
-        <div className="flex items-center justify-between w-full pl-4 md:pl-[276px] pr-4 pb-2 opacity-75">
-          <div className="flex items-center gap-3">
-            <span>ARC_CORE: <span className="text-[var(--gold)]">98.4%</span></span>
-            <span className="hidden sm:inline text-[var(--line)]">|</span>
-            <span>MSGS: <span className="text-[var(--cyan)]">{messageCount}</span></span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {lastLatencyMs !== null && (
-              <>
-                <span>LATENCY: <span className="text-[var(--cyan)]">{lastLatencyMs}ms</span></span>
-                <span className="hidden sm:inline text-[var(--line)]">|</span>
-              </>
-            )}
-            <span className="uppercase text-[var(--gold)] tracking-wider">PROTO: STARK-HUD</span>
-          </div>
+          <JarvisOrb state={state === 'error' ? 'idle' : state} level={level} className="w-full h-full" />
         </div>
       </div>
+
+      {/* 5. Telemetry Safe Zones: strictly inside chat area, above composer, 40% opacity */}
+      {/* Bottom-Left Safe Zone */}
+      <div
+        id="hud-telemetry-left"
+        className="absolute left-4 font-mono text-[10px] tracking-wider text-[var(--text-3)] opacity-40 select-none flex items-center gap-2 pointer-events-none z-10"
+        style={{ bottom: `calc(${composerHeight}px + 12px)` }}
+      >
+        <span className="font-semibold text-[var(--cyan)]">HUD.v7.4</span>
+        <span>·</span>
+        <span>{clock}</span>
+        <span>·</span>
+        <span className={isOnline ? 'text-[var(--cyan)]' : 'text-[var(--red)]'}>
+          SYS: {isOnline ? 'NOMINAL' : 'OFFLINE'}
+        </span>
+      </div>
+
+      {/* Bottom-Right Safe Zone */}
+      <div
+        id="hud-telemetry-right"
+        className="absolute right-4 font-mono text-[10px] tracking-wider text-[var(--text-3)] opacity-40 select-none flex items-center gap-2 pointer-events-none z-10"
+        style={{ bottom: `calc(${composerHeight}px + 12px)` }}
+      >
+        <span>MSGS: {messageCount}</span>
+        {lastLatencyMs !== null && (
+          <>
+            <span>·</span>
+            <span>LAT: {lastLatencyMs}ms</span>
+          </>
+        )}
+      </div>
+
+      {/* 6. Debug Overlay (?debug=1) */}
+      {isDebug && (
+        <div
+          id="hud-debug-overlay"
+          className="absolute inset-0 border-2 border-magenta-500 pointer-events-none z-50 text-[10px] font-mono text-magenta-400 select-none"
+        >
+          {/* Main center crosshairs */}
+          <div className="absolute left-0 right-0 top-1/2 h-[1px] bg-yellow-400/60 pointer-events-none" />
+          <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-yellow-400/60 pointer-events-none" />
+          
+          {/* Center marker circle */}
+          <div className="absolute left-1/2 top-1/2 w-6 h-6 -ml-3 -mt-3 rounded-full border border-yellow-400 pointer-events-none flex items-center justify-center">
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+          </div>
+
+          {/* Safe zone visual outlines */}
+          <div
+            className="absolute left-3 p-1 border border-dashed border-cyan-400/80 bg-cyan-950/40 text-cyan-300 pointer-events-none"
+            style={{ bottom: `calc(${composerHeight}px + 8px)` }}
+          >
+            SAFE ZONE (LEFT TELEMETRY)
+          </div>
+
+          <div
+            className="absolute right-3 p-1 border border-dashed border-cyan-400/80 bg-cyan-950/40 text-cyan-300 pointer-events-none"
+            style={{ bottom: `calc(${composerHeight}px + 8px)` }}
+          >
+            SAFE ZONE (RIGHT TELEMETRY)
+          </div>
+
+          {/* Diagnostic badge */}
+          <div className="absolute top-[60px] left-3 bg-black/85 border border-magenta-500/80 p-2 text-white max-w-[260px] z-50">
+            <div className="font-bold text-magenta-300">HUD DIAGNOSTICS (?debug=1)</div>
+            <div>Chat Area: {containerSize.width} × {containerSize.height} px</div>
+            <div>Center Point: ({Math.round(containerSize.width / 2)}, {Math.round(containerSize.height / 2)})</div>
+            <div>Ring Scale: {ringScale.toFixed(3)} (Shorter Side: {minSide}px)</div>
+            <div>Composer Safe Offset: {composerHeight + 12}px</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

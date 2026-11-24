@@ -1,16 +1,9 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import dynamic from 'next/dynamic'
+import { motion, AnimatePresence } from 'framer-motion'
 import { getTimeOfDayGreeting } from '@/lib/utils'
 import type { CoreState } from './JarvisCore'
-import JarvisCore from './JarvisCore'
-
-const JarvisOrb = dynamic(() => import('./JarvisOrb'), {
-  ssr: false,
-  loading: () => <JarvisCore size={300} state="idle" />,
-})
 
 interface EmptyStateProps {
   onSuggestionClick: (prompt: string) => void
@@ -44,24 +37,17 @@ export function EmptyState({ onSuggestionClick, state = 'idle', level = 0 }: Emp
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-4 w-full select-none">
-      {/* Orb stage: fades into page via radial-gradient mask */}
-      <motion.div
-        layoutId="jarvis-orb-reactor"
-        transition={{ type: 'spring', stiffness: 220, damping: 26 }}
-        className="relative flex items-center justify-center shrink-0"
+      {/* Orb stage: transparent spacer allowing concentric backdrop orb to shine through */}
+      <div
+        className="relative flex items-center justify-center shrink-0 pointer-events-none"
         style={{
-          height: 'clamp(180px, 36dvh, 340px)',
+          height: 'clamp(180px, 36dvh, 320px)',
           aspectRatio: '1',
           width: 'auto',
           maxWidth: '100%',
           marginInline: 'auto',
-          background: 'transparent',
-          WebkitMaskImage: 'radial-gradient(closest-side, #000 62%, transparent 100%)',
-          maskImage: 'radial-gradient(closest-side, #000 62%, transparent 100%)',
         }}
-      >
-        <JarvisOrb state={state} level={level} />
-      </motion.div>
+      />
 
       {/* Greeting: sits BELOW orb stage with 16px gap, never overlaps */}
       <div className="flex flex-col items-center gap-2 w-full text-center">

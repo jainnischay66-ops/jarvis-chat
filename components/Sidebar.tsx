@@ -138,13 +138,13 @@ export function Sidebar({
                       transition={{ duration: 0.25, delay: idx * 0.05, ease: [0.22, 1, 0.36, 1] }}
                       className={`group relative flex items-center justify-between h-[44px] px-4 text-xs transition-all border-l-2 ${
                         isActive
-                          ? 'border-[var(--cyan)] text-[var(--cyan)] sidebar-row-active flow-border flow-active font-medium'
+                          ? 'border-[var(--gold)] text-[var(--gold)] sidebar-row-active flow-border flow-active font-medium'
                           : 'border-transparent text-[var(--text-2)] hover:border-[var(--line)] hover:bg-[var(--surface-hi)]/50 hover:text-[var(--text)]'
                       }`}
                     >
-                      {/* Active conversation subtle cyan dot indicator */}
+                      {/* Active conversation subtle gold dot indicator */}
                       {isActive && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)] mr-2 shrink-0 animate-pulse" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--gold)] shadow-[0_0_8px_var(--gold)] mr-2 shrink-0 animate-pulse" />
                       )}
 
                       {/* Pinned row tick marks */}

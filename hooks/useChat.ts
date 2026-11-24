@@ -183,8 +183,17 @@ export function useChat({
       }
 
       const nextMessages = [...currentConversation.messages, userMsg]
+      
+      // Immediately set title from first user message (truncated to ~40 characters)
+      const currentTitle = currentConversation.title
+      const needsTitle = !currentTitle || currentTitle === 'New conversation' || currentTitle === 'NEW CONVERSATION' || currentTitle === 'NEW PROTOCOL'
+      const derivedTitle = needsTitle
+        ? (content.trim().slice(0, 40) || 'New conversation')
+        : currentTitle
+
       const updatedConv = {
         ...currentConversation,
+        title: derivedTitle,
         messages: nextMessages,
         draft: '',
       }

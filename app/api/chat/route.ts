@@ -172,5 +172,5 @@ export async function POST(request: NextRequest) {
 // Config endpoint to check if API is set up
 export async function GET() {
   const status = getConfigStatus()
-  return NextResponse.json(status)
+  return NextResponse.json({ status, ...status })
 }

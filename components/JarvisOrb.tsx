@@ -168,6 +168,10 @@ function Scene({ state, level, onActivate }: { state: CoreState; level: number; 
   const glowU = useMemo(() => ({ uInt: { value: 1 }, uThink: { value: 0 }, uCyan: { value: CYAN }, uGold: { value: GOLD } }), []);
   const gl = useThree((s) => s.gl);
 
+  useLayoutEffect(() => {
+    gl.setClearColor(0x000000, 0);
+  }, [gl]);
+
   useEffect(() => () => { shell.dispose(); dust.dispose(); wire.dispose(); }, [shell, dust, wire]);
   useEffect(() => {
     const g = grid.current;
@@ -203,14 +207,12 @@ function Scene({ state, level, onActivate }: { state: CoreState; level: number; 
     glow.current.scale.setScalar(1 + L.level * 0.5 + L.pulse * 0.3);
     grid.current.position.z = (t * 0.5) % 1;
 
-    s.camera.position.x += (s.pointer.x * 0.9 - s.camera.position.x) * 0.04;
-    s.camera.position.y += (0.6 + s.pointer.y * 0.4 - s.camera.position.y) * 0.04;
+    s.camera.position.set(0, 0, 8.2);
     s.camera.lookAt(0, 0, 0);
   });
 
   return (
     <>
-      <fog attach="fog" args={[BG, 9, 24]} />
       <gridHelper ref={grid} args={[40, 40, "#1B4A63", "#1B4A63"]} position={[0, -2.9, 0]} />
       <points geometry={dust} frustumCulled={false}>
         <pointsMaterial size={0.03} sizeAttenuation transparent opacity={0.55} depthWrite={false}
@@ -253,10 +255,18 @@ export default function JarvisOrb({ state = "idle", level = 0, className, onActi
 
   return (
     <div className={className} aria-label={`J.A.R.V.I.S., ${state}`}
-      style={{ position: "relative", width: "100%", height: "100%", background: "transparent", overflow: "hidden" }}>
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        background: "transparent",
+        overflow: "hidden",
+        maskImage: "radial-gradient(circle at center, #000 55%, transparent 85%)",
+        WebkitMaskImage: "radial-gradient(circle at center, #000 55%, transparent 85%)",
+      }}>
       <Canvas frameloop={visible ? "always" : "never"} dpr={[1, 1.5]}
-        camera={{ position: [0, 0.6, 8.2], fov: 45 }}
-        gl={{ alpha: true, antialias: false, powerPreference: "high-performance" }}>
+        camera={{ position: [0, 0, 8.2], fov: 45 }}
+        gl={{ alpha: true, premultipliedAlpha: false, antialias: true, powerPreference: "high-performance" }}>
         <Scene state={state} level={level} onActivate={onActivate} />
       </Canvas>
     </div>
