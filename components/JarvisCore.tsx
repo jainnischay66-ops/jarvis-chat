@@ -10,9 +10,11 @@ const pt = (r: number, deg: number) => {
   return [C + r * Math.cos(a), C + r * Math.sin(a)];
 };
 const arc = (r: number, a0: number, a1: number) => {
+  let end = a1;
+  if (end < a0) end += 360;
   const [x0, y0] = pt(r, a0);
-  const [x1, y1] = pt(r, a1);
-  return `M${x0} ${y0} A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1} ${y1}`;
+  const [x1, y1] = pt(r, end);
+  return `M${x0} ${y0} A${r} ${r} 0 ${end - a0 > 180 ? 1 : 0} 1 ${x1} ${y1}`;
 };
 const ticks = (n: number, r0: number, r1: number, major = 5) =>
   Array.from({ length: n }, (_, i) => {
@@ -93,17 +95,19 @@ function JarvisCore({ size = 420, state = "idle", level = 0, label = "J.A.R.V.I.
           <circle cx="250" cy="250" r="116" strokeWidth="1" opacity=".5" />
         </g>
 
-        {/* Radial voice waveform (active during listening / speaking) */}
+        {/* Radial voice waveform (active during listening / speaking, length computed from level prop) */}
         <g className="wave" opacity="0">
           {Array.from({ length: 56 }, (_, i) => {
             const deg = (360 / 56) * i;
+            const waveOffset = Math.sin((i / 56) * Math.PI * 8);
+            const dynamicLen = 4 + level * (12 + waveOffset * 6);
+            const len = Math.max(3, dynamicLen);
             const [x0, y0] = pt(126, deg);
-            const [x1, y1] = pt(142, deg);
+            const [x1, y1] = pt(126 + len, deg);
             return (
               <line
                 key={i}
                 className="bar"
-                style={{ animationDelay: `${(i % 14) * -90}ms` }}
                 x1={x0}
                 y1={y0}
                 x2={x1}
@@ -111,6 +115,7 @@ function JarvisCore({ size = 420, state = "idle", level = 0, label = "J.A.R.V.I.
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 stroke="var(--cyan)"
+                opacity={0.4 + level * 0.6}
               />
             );
           })}

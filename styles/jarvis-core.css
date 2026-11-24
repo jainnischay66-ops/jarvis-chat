@@ -1,15 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800;900&display=swap');
-
 .jcore{cursor:pointer;overflow:visible;transition:transform .4s cubic-bezier(.2,.8,.2,1)}
 .jcore g,.jcore circle,.jcore path{transform-box:fill-box;transform-origin:center}
-.jcore .jlabel{font-family:"Orbitron", var(--font-orbitron), sans-serif;font-size:27px;font-weight:700;letter-spacing:.14em;fill:#EAF8FF;filter:drop-shadow(0 0 8px var(--cyan))}
+.jcore .jlabel{font-family:var(--font-orbitron),sans-serif;font-size:27px;font-weight:700;letter-spacing:.14em;fill:#EAF8FF;filter:drop-shadow(0 0 8px var(--cyan))}
 .spin-slow{animation:jspin 60s linear infinite}
 .spin-med{animation:jspin 38s linear infinite reverse}
 .spin-rev{animation:jspin 90s linear infinite reverse}
 .spin-rev-slow{animation:jspin 120s linear infinite reverse}
 .amber-dot{animation:jblink 2.4s ease-in-out infinite}
 .amber-dot:nth-child(3){animation-delay:.3s}.amber-dot:nth-child(4){animation-delay:.6s}.amber-dot:nth-child(5){animation-delay:.9s}.amber-dot:nth-child(6){animation-delay:1.2s}
-.wave .bar{stroke-dasharray:16;stroke-dashoffset:0;animation:jbar .7s ease-in-out infinite}
+.wave .bar{transition:all .12s ease-out}
 .jcore[data-state="listening"] .wave,.jcore[data-state="speaking"] .wave{opacity:1}
 .jcore[data-state="listening"] .spin-med{animation-duration:22s}
 .jcore[data-state="thinking"] .spin-slow{animation-duration:9s}
@@ -19,5 +17,4 @@
 .jcore[data-state="speaking"] .spin-med{animation-duration:16s}
 @keyframes jspin{to{transform:rotate(360deg)}}
 @keyframes jblink{0%,100%{opacity:.25}50%{opacity:1}}
-@keyframes jbar{0%,100%{stroke-dashoffset:calc(9px - var(--lvl) * 5px);opacity:.4}50%{stroke-dashoffset:0;opacity:1}}
 @media (prefers-reduced-motion:reduce){.jcore *{animation:none!important}}

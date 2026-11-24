@@ -1,6 +1,14 @@
 import type { Metadata, Viewport } from 'next'
+import { Orbitron } from 'next/font/google'
 import './globals.css'
 import '../styles/jarvis-core.css'
+
+const orbitron = Orbitron({
+  subsets: ['latin'],
+  weight: ['500', '600', '700', '800', '900'],
+  variable: '--font-orbitron',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'Jarvis',
@@ -34,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={orbitron.variable} suppressHydrationWarning>
       <head>
         <link
           rel="preconnect"
@@ -46,7 +54,7 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Orbitron:wght@500;600;700;800;900&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
         <script
