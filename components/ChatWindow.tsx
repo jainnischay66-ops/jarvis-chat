@@ -17,6 +17,7 @@ import { ScrollToBottom } from './ScrollToBottom'
 import { SetupScreen } from './SetupScreen'
 import { SettingsSheet } from './SettingsSheet'
 import { CommandPalette } from './CommandPalette'
+import { HudBackdrop } from './HudBackdrop'
 import type { ConfigStatus } from '@/lib/env'
 import type { CoreState } from './JarvisCore'
 
@@ -27,6 +28,8 @@ export default function ChatWindow() {
 
   const [hasScrolled, setHasScrolled] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null)
+  const sendTimeRef = useRef<number | null>(null)
 
   // On mobile screens, start with sidebar closed so chat is immediately visible
   useEffect(() => {
@@ -168,17 +171,40 @@ export default function ChatWindow() {
 
   const coreLevel = isListening ? 0.6 : streamLevel
 
-  // Check backend config
+  // Track response latency
+  useEffect(() => {
+    if (isStreaming && streamingContent && sendTimeRef.current !== null) {
+      const elapsed = Math.round(performance.now() - sendTimeRef.current)
+      setLastLatencyMs(elapsed)
+      sendTimeRef.current = null
+    }
+  }, [isStreaming, streamingContent])
+
+  const handleSendMessage = useCallback(
+    async (content: string, attachments?: any[]) => {
+      sendTimeRef.current = performance.now()
+      sendMessage(content, attachments)
+    },
+    [sendMessage]
+  )
+
+  // Check backend config and align active provider if configured on server
   useEffect(() => {
     fetch('/api/chat')
       .then(r => r.json())
       .then(data => {
         if (data.status) {
           setConfigStatus(data.status)
+          if (data.status.provider && data.status.configured) {
+            updatePreferences({
+              provider: data.status.provider,
+              model: data.status.model,
+            })
+          }
         }
       })
       .catch(() => {})
-  }, [])
+  }, [updatePreferences])
 
   // Scroll anchor ref
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
@@ -278,8 +304,15 @@ export default function ChatWindow() {
         sidebarOpen ? '' : 'sidebar-closed'
       }`}
     >
-      {/* Faint HUD backdrop: fixed full-screen CSS grid (60px cells, cyan at 4% opacity) with radial vignette */}
-      <div className="hud-grid-backdrop pointer-events-none" />
+      {/* Living Holographic HUD Backdrop: concentric rotating rings, particle dust, perspective grid floor */}
+      <HudBackdrop
+        state={coreState}
+        level={coreLevel}
+        hasMessages={hasMessages}
+        messageCount={currentConversation?.messages?.length || 0}
+        lastLatencyMs={lastLatencyMs}
+        isOnline={isOnline}
+      />
 
       {/* Offline banner */}
       {!isOnline && (
@@ -358,7 +391,7 @@ export default function ChatWindow() {
                 }
               }}
               isReading={isSpeaking}
-              onSuggestionClick={prompt => sendMessage(prompt)}
+              onSuggestionClick={prompt => handleSendMessage(prompt)}
               scrollContainerRef={scrollContainerRef}
               state={coreState}
               level={coreLevel}
@@ -376,7 +409,7 @@ export default function ChatWindow() {
         <div className="composer-wrap w-full">
           <div className="column w-full max-w-[760px] mx-auto px-0">
             <Composer
-              onSend={(content, attachments) => sendMessage(content, attachments)}
+              onSend={(content, attachments) => handleSendMessage(content, attachments)}
               onStop={stopStreaming}
               isStreaming={isStreaming}
               editingMessage={editingMessage}

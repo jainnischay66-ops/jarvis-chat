@@ -7,7 +7,7 @@ import type { CoreState } from './JarvisCore'
 
 interface TopBarProps {
   title: string
-  modelName: string
+  modelName?: string
   hasScrolled: boolean
   sidebarOpen: boolean
   onToggleSidebar: () => void
@@ -93,8 +93,8 @@ export function TopBar({
         </span>
       </div>
 
-      {/* Center: title in Rajdhani 14px uppercase, tracking .12em, one line, ellipsis; model in 11px mono text-3 */}
-      <div className="flex flex-col items-center justify-center max-w-[45%] sm:max-w-[55%] min-w-0">
+      {/* Center: title in Rajdhani 14px uppercase, tracking .12em, one line, ellipsis */}
+      <div className="flex items-center justify-center max-w-[45%] sm:max-w-[55%] min-w-0">
         {isEditing ? (
           <input
             ref={inputRef}
@@ -114,9 +114,6 @@ export function TopBar({
             {displayTitle}
           </button>
         )}
-        <span className="font-mono text-[11px] text-[var(--text-3)] truncate leading-tight text-center">
-          {modelName}
-        </span>
       </div>
 
       {/* Right: ONLINE chip (11px) and settings button (44px touch target) */}

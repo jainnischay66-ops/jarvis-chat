@@ -27,13 +27,20 @@ export function useStorage() {
     setIsLoading(true)
     try {
       const all = await storage.getAllConversations()
-      setConversations(all)
+      // Filter out and purge any empty conversations from storage
+      const nonEmpty = all.filter(c => c.messages && c.messages.length > 0)
+      const emptyOrphans = all.filter(c => !c.messages || c.messages.length === 0)
+      for (const orphan of emptyOrphans) {
+        storage.deleteConversation(orphan.id).catch(() => {})
+      }
+
+      setConversations(nonEmpty)
 
       const prefs = getUIPreferences()
       setPreferences(prefs)
 
       if (prefs.lastConversationId) {
-        const last = all.find(c => c.id === prefs.lastConversationId)
+        const last = nonEmpty.find(c => c.id === prefs.lastConversationId)
         if (last) {
           setCurrentConversation(last)
           setIsLoading(false)
@@ -41,10 +48,10 @@ export function useStorage() {
         }
       }
 
-      if (all.length > 0) {
-        setCurrentConversation(all[0])
+      if (nonEmpty.length > 0) {
+        setCurrentConversation(nonEmpty[0])
       } else {
-        // Create initial conversation
+        // Ephemeral initial conversation (NOT persisted to storage until first message)
         const initial: Conversation = {
           id: generateId(),
           title: 'New conversation',
@@ -52,8 +59,6 @@ export function useStorage() {
           createdAt: Date.now(),
           updatedAt: Date.now(),
         }
-        await storage.saveConversation(initial)
-        setConversations([initial])
         setCurrentConversation(initial)
       }
     } catch (e) {
@@ -85,6 +90,10 @@ export function useStorage() {
   )
 
   const createConversation = useCallback(async (): Promise<Conversation> => {
+    // If current conversation is already empty, reuse it instead of duplicating
+    if (currentConversation && (!currentConversation.messages || currentConversation.messages.length === 0)) {
+      return currentConversation
+    }
     const newConv: Conversation = {
       id: generateId(),
       title: 'New conversation',
@@ -92,19 +101,23 @@ export function useStorage() {
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }
-    await storage.saveConversation(newConv)
-    setConversations(prev => [newConv, ...prev])
+    // Set as active draft; do not persist to IndexedDB until first message is sent
     setCurrentConversation(newConv)
     saveUIPreferences({ lastConversationId: newConv.id })
     return newConv
-  }, [storage])
+  }, [currentConversation])
 
   const updateConversation = useCallback(
     async (conv: Conversation) => {
       const updated = { ...conv, updatedAt: Date.now() }
-      await storage.saveConversation(updated)
+      if (updated.messages && updated.messages.length > 0) {
+        await storage.saveConversation(updated)
+      }
       setConversations(prev => {
         const without = prev.filter(c => c.id !== updated.id)
+        if (!updated.messages || updated.messages.length === 0) {
+          return without
+        }
         return [updated, ...without].sort((a, b) => {
           if (a.pinned && !b.pinned) return -1
           if (!a.pinned && b.pinned) return 1
@@ -236,6 +249,9 @@ export function useStorage() {
     const startOf7Days = startOfToday - 6 * 86400000
 
     conversations.forEach(c => {
+      // Never display empty conversations in sidebar groups
+      if (!c.messages || c.messages.length === 0) return
+
       if (c.pinned) {
         pinned.push(c)
         return

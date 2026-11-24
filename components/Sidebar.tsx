@@ -135,7 +135,7 @@ export function Sidebar({
                       key={c.id}
                       className={`group relative flex items-center justify-between h-[44px] px-4 text-xs transition-all border-l-2 ${
                         isActive
-                          ? 'border-[var(--gold)] text-[var(--gold)] bg-[var(--surface-hi)] font-medium'
+                          ? 'border-[var(--gold)] text-[var(--gold)] sidebar-row-active font-medium'
                           : 'border-transparent text-[var(--text-2)] hover:border-[var(--line)] hover:bg-[var(--surface-hi)]/50 hover:text-[var(--text)]'
                       }`}
                     >

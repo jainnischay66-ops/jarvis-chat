@@ -208,7 +208,7 @@ export function Composer({
           setIsDragging(false)
           handleFileSelect(e.dataTransfer.files)
         }}
-        className="chamfer-card holo-brackets holo-scanlines min-h-[56px] p-2 bg-[var(--surface)] border border-[var(--line)] flex flex-col justify-center"
+        className="chamfer-card holo-brackets holo-scanlines composer-terminal min-h-[56px] p-2 bg-[var(--surface)] border border-[var(--line)] flex flex-col justify-center"
       >
         {/* Editing Banner */}
         {editingMessage && (
@@ -262,6 +262,11 @@ export function Composer({
           >
             <Paperclip size={18} strokeWidth={1.5} />
           </button>
+
+          {/* Terminal Command Prompt Symbol */}
+          <span className="font-mono text-sm text-[var(--cyan)] opacity-70 select-none py-2 pl-1 pr-1.5 leading-relaxed shrink-0">
+            ›
+          </span>
 
           {/* Textarea: 16px font, grows to 8 lines */}
           <textarea

@@ -254,25 +254,11 @@ export default function JarvisOrb({ state = "idle", level = 0, className, onActi
   return (
     <div className={className} aria-label={`J.A.R.V.I.S., ${state}`}
       style={{ position: "relative", width: "100%", height: "100%", background: "transparent", overflow: "hidden" }}>
-      <Canvas frameloop={visible ? "always" : "never"} dpr={[1, 1.75]}
+      <Canvas frameloop={visible ? "always" : "never"} dpr={[1, 1.5]}
         camera={{ position: [0, 0.6, 8.2], fov: 45 }}
         gl={{ alpha: true, antialias: false, powerPreference: "high-performance" }}>
         <Scene state={state} level={level} onActivate={onActivate} />
       </Canvas>
-      <div style={{ position: "absolute", bottom: 8, insetInline: 0, display: "flex", flexDirection: "column",
-        alignItems: "center", pointerEvents: "none" }}>
-        <div style={{ padding: "4px 14px",
-          color: "#EAF9FF", fontWeight: 600, fontSize: 13, letterSpacing: "0.25em",
-          fontFamily: "var(--font-orbitron), sans-serif",
-          textShadow: "0 0 8px rgba(92,203,245,0.6)" }}>
-          J.A.R.V.I.S.
-        </div>
-        <div style={{ fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase",
-          fontFamily: "var(--font-mono), monospace",
-          color: "rgba(92,203,245,0.6)" }}>
-          {state}
-        </div>
-      </div>
     </div>
   );
 }

@@ -45,7 +45,7 @@ export function MessageList({
   }
 
   return (
-    <div className="w-full flex flex-col justify-start min-h-full py-4 space-y-4">
+    <div className="w-full flex flex-col justify-start min-h-full pt-4 pb-24 space-y-6">
       {messages.map((message, idx) => (
         <Message
           key={message.id}
