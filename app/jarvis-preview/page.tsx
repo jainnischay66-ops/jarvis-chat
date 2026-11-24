@@ -1,7 +1,17 @@
 'use client'
 
 import React, { useState } from 'react'
+import dynamic from 'next/dynamic'
 import JarvisCore, { CoreState } from '@/components/JarvisCore'
+
+const JarvisOrb = dynamic(() => import('@/components/JarvisOrb'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[520px] flex items-center justify-center">
+      <JarvisCore size={460} state="idle" />
+    </div>
+  ),
+})
 
 export default function JarvisPreviewPage() {
   const [state, setState] = useState<CoreState>('idle')
@@ -11,24 +21,9 @@ export default function JarvisPreviewPage() {
 
   return (
     <div className="min-h-screen w-full bg-[var(--color-bg)] flex flex-col items-center justify-center p-6 select-none relative overflow-hidden">
-      {/* Bloom background behind the core */}
-      <div className="relative flex items-center justify-center">
-        <div
-          className="absolute rounded-full pointer-events-none transition-all duration-700"
-          style={{
-            width: 520,
-            height: 520,
-            background:
-              state === 'thinking'
-                ? 'radial-gradient(circle, rgba(255, 184, 51, 0.25) 0%, rgba(76, 230, 255, 0.15) 35%, transparent 70%)'
-                : 'radial-gradient(circle, rgba(76, 230, 255, 0.28) 0%, rgba(76, 230, 255, 0.12) 38%, transparent 70%)',
-            filter: 'blur(36px)',
-          }}
-        />
-
-        <div className="relative z-10">
-          <JarvisCore size={460} state={state} level={level} />
-        </div>
+      {/* 520px tall, full width container for the 3D particle orb */}
+      <div className="w-full max-w-4xl h-[520px] relative flex items-center justify-center rounded-3xl overflow-hidden border border-[var(--color-separator)] bg-[#04060B]">
+        <JarvisOrb state={state} level={level} className="w-full h-full" />
       </div>
 
       {/* Control panel */}
