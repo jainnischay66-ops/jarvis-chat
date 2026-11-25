@@ -5,6 +5,7 @@ const securityHeaders = [
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-XSS-Protection', value: '1; mode=block' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy', value: 'microphone=(self)' },
   {
     key: 'Content-Security-Policy',
     value: [
@@ -13,6 +14,8 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob:",
+      "media-src 'self' blob: data:",
+      "worker-src 'self' blob:",
       "connect-src 'self' https://generativelanguage.googleapis.com https://api.anthropic.com",
       "frame-ancestors 'none'",
     ].join('; '),

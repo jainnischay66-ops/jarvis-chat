@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getAudioContext, playActivationSound } from '@/lib/tts'
 import { getRandomWakeLine } from '@/lib/wakeLines'
+import { detectVoiceSupport } from '@/lib/voice/capabilities'
 
 interface ActivationSequenceProps {
   onComplete: () => void
@@ -79,17 +80,17 @@ export function ActivationSequence({ onComplete, speakGreeting }: ActivationSequ
 
       // 2. Real Telemetry Diagnostics
       // Step A: Voice link check
-      let voiceOk = false
-      if (typeof window !== 'undefined') {
-        voiceOk = Boolean(
-          ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) ||
-          'speechSynthesis' in window
-        )
-      }
+      const voiceSupport = detectVoiceSupport()
+      const hasSpeechSynth = typeof window !== 'undefined' && 'speechSynthesis' in window
+      const voiceOk = voiceSupport.supported
       await new Promise(r => setTimeout(r, reducedMotion ? 50 : 350))
       if (!active) return
       setTelemetry(prev => [
-        { label: 'VOICE LINK', status: voiceOk ? 'ok' : 'warn', detail: voiceOk ? 'OK' : 'SYNTH ONLY' },
+        {
+          label: 'VOICE LINK',
+          status: voiceOk ? 'ok' : 'warn',
+          detail: voiceOk ? 'OK' : hasSpeechSynth ? 'SYNTH ONLY' : 'UNSUPPORTED',
+        },
         prev[1],
         prev[2],
       ])

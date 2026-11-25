@@ -201,9 +201,15 @@ export default function ChatWindow() {
     isListening,
     isSpeaking,
     isSupported: voiceSupported,
+    permissionState,
+    statusLabel,
+    unsupportedMessage,
+    voiceError,
+    clearVoiceError,
     isAudioBlocked,
     unlockAudio,
     startListening,
+    stopListening,
     speak,
     stopSpeaking,
     enqueueStreamChunk,
@@ -218,11 +224,6 @@ export default function ChatWindow() {
     voicePitch: preferences.voicePitch,
     voiceVolume: preferences.voiceVolume,
     voiceHolographicEffect: preferences.voiceHolographicEffect ?? false,
-    wakeWordEnabled: preferences.wakeWordEnabled,
-    onWakeWord: () => {
-      toast('WAKE PROTOCOL: JARVIS LISTENING')
-      handleVoiceStart()
-    },
     onLevel: level => setTtsLevel(level),
   })
 
@@ -609,7 +610,6 @@ export default function ChatWindow() {
       {powerState === 'STANDBY' && (
         <StandbyScreen
           onWake={() => handleSetPowerState('BOOTING')}
-          autoListen={preferences.listenWakePhraseWhileTabOpen}
           onMicLevel={setMicRms}
           speakText={async text => {
             await unlockAudio()
@@ -831,7 +831,13 @@ export default function ChatWindow() {
                 }
               }}
               voiceSupported={voiceSupported}
+              micPermissionState={permissionState}
+              micStatusLabel={statusLabel}
+              unsupportedVoiceMessage={unsupportedMessage}
+              voiceError={voiceError}
+              onClearVoiceError={clearVoiceError}
               onVoiceStart={handleVoiceStart}
+              onVoiceStop={stopListening}
               isListening={isListening}
               keyboardHeight={keyboardHeight}
               onOpenVoiceCommands={() => setIsVoiceCommandsOpen(true)}

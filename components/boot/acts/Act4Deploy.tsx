@@ -2,23 +2,26 @@
 
 import React, { useState, useEffect } from 'react'
 import { interpolate, clamp } from '@/lib/boot/timeline'
+import { queryMicPermission, type MicStatusLabel } from '@/lib/voice/capabilities'
 
 interface Act4DeployProps {
   time: number
   onPlayTick?: (pitch: number) => void
 }
 
+type TelemetryStatus = 'READY' | 'WARN' | 'FAIL' | MicStatusLabel
+
 interface RealSystemCheck {
   id: string
   label: string
-  status: 'READY' | 'WARN' | 'FAIL'
+  status: TelemetryStatus
   detail?: string
 }
 
 export function Act4Deploy({ time }: Act4DeployProps) {
-  // Real system checks
+  // Real system checks — never default MIC INTERFACE to READY before querying permission
   const [checks, setChecks] = useState<RealSystemCheck[]>([
-    { id: 'mic', label: 'MIC INTERFACE', status: 'READY' },
+    { id: 'mic', label: 'MIC INTERFACE', status: 'TAP TO ALLOW' },
     { id: 'llm', label: 'NEURAL MODEL LINK', status: 'READY' },
     { id: 'idb', label: 'INDEXEDDB STORAGE', status: 'READY' },
     { id: 'tts', label: 'VOICE SYNTHESIS ENGINE', status: 'READY' },
@@ -30,15 +33,12 @@ export function Act4Deploy({ time }: Act4DeployProps) {
     let active = true
 
     async function performRealChecks() {
-      let micStatus: 'READY' | 'WARN' = 'READY'
+      let micStatus: MicStatusLabel = 'TAP TO ALLOW'
       try {
-        if (typeof window !== 'undefined') {
-          if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-            micStatus = 'WARN'
-          }
-        }
+        const perm = await queryMicPermission()
+        micStatus = perm.label
       } catch {
-        micStatus = 'WARN'
+        micStatus = 'TAP TO ALLOW'
       }
 
       let llmStatus: 'READY' | 'WARN' | 'FAIL' = 'READY'
@@ -140,8 +140,11 @@ export function Act4Deploy({ time }: Act4DeployProps) {
             const isVisible = time >= 19.6 + idx * 0.25
             if (!isVisible) return null
 
-            const isFail = chk.status === 'FAIL'
-            const isWarn = chk.status === 'WARN'
+            const isFail = chk.status === 'FAIL' || chk.status === 'BLOCKED'
+            const isWarn =
+              chk.status === 'WARN' ||
+              chk.status === 'TAP TO ALLOW' ||
+              chk.status === 'UNSUPPORTED'
             const statusColor = isFail
               ? 'text-[var(--red)]'
               : isWarn

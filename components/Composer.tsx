@@ -1,9 +1,10 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
-import { ArrowUp, Square, Paperclip, Mic, X, HelpCircle } from 'lucide-react'
+import { ArrowUp, Square, Paperclip, Mic, X, HelpCircle, AlertCircle } from 'lucide-react'
 import type { StoredAttachment } from '@/lib/storage'
 import { generateId } from '@/lib/utils'
+import type { MicPermissionState, MicStatusLabel } from '@/lib/voice/capabilities'
 
 interface ComposerProps {
   onSend: (content: string, attachments?: StoredAttachment[]) => void
@@ -15,7 +16,13 @@ interface ComposerProps {
   draft?: string
   onDraftChange?: (draft: string) => void
   voiceSupported: boolean
+  micPermissionState?: MicPermissionState
+  micStatusLabel?: MicStatusLabel
+  unsupportedVoiceMessage?: string | null
+  voiceError?: string | null
+  onClearVoiceError?: () => void
   onVoiceStart: () => void
+  onVoiceStop?: () => void
   isListening: boolean
   keyboardHeight?: number
   onOpenVoiceCommands?: () => void
@@ -31,7 +38,13 @@ export function Composer({
   draft = '',
   onDraftChange,
   voiceSupported,
+  micPermissionState = 'prompt',
+  micStatusLabel = 'TAP TO ALLOW',
+  unsupportedVoiceMessage,
+  voiceError,
+  onClearVoiceError,
   onVoiceStart,
+  onVoiceStop,
   isListening,
   onOpenVoiceCommands,
 }: ComposerProps) {
@@ -191,6 +204,30 @@ export function Composer({
         </div>
       )}
 
+      {/* Voice Error Banner */}
+      {voiceError && (
+        <div
+          role="alert"
+          data-testid="composer-voice-error"
+          className="flex items-center justify-between gap-2 px-3 py-1.5 mb-2 border border-[var(--red)] bg-[var(--surface)] font-mono text-xs text-[var(--red)]"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertCircle size={14} className="shrink-0" />
+            <span className="truncate sm:whitespace-normal">{voiceError}</span>
+          </div>
+          {onClearVoiceError && (
+            <button
+              type="button"
+              onClick={onClearVoiceError}
+              aria-label="Dismiss voice error"
+              className="text-[var(--text-3)] hover:text-[var(--text)] p-0.5 shrink-0 cursor-pointer"
+            >
+              <X size={13} strokeWidth={2} />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Drag & drop overlay */}
       {isDragging && (
         <div className="mb-2 p-6 flex items-center justify-center font-hud text-sm tracking-wider text-[var(--cyan)] select-none border border-[var(--cyan)] bg-[var(--surface)]">
@@ -282,14 +319,22 @@ export function Composer({
             className="flex-1 bg-transparent font-sans text-body text-[var(--text)] placeholder-[var(--text-3)] resize-none outline-none py-2 max-h-[200px] overflow-y-auto leading-relaxed"
           />
 
-          {/* Voice button: 18px icon in 44px hit area */}
+          {/* Voice button (hidden on unsupported browsers) */}
           {voiceSupported && !isStreaming && (
             <button
-              onClick={onVoiceStart}
-              aria-label={isListening ? 'Listening...' : 'Voice input'}
-              title="Voice input"
-              className={`w-11 h-11 flex items-center justify-center text-[var(--text-2)] hover:text-[var(--cyan)] hover:bg-[var(--surface-hi)] active:scale-95 transition-all flex-shrink-0 cursor-pointer ${
-                isListening ? 'text-[var(--cyan)] animate-pulse' : ''
+              type="button"
+              data-testid="composer-mic-button"
+              onClick={isListening && onVoiceStop ? onVoiceStop : onVoiceStart}
+              aria-label={isListening ? 'Listening...' : `Voice input (${micStatusLabel})`}
+              title={isListening ? 'Listening... (tap to stop)' : `Voice input: ${micStatusLabel}`}
+              className={`relative w-11 h-11 flex items-center justify-center hover:bg-[var(--surface-hi)] active:scale-95 transition-all flex-shrink-0 cursor-pointer ${
+                isListening
+                  ? 'text-[var(--cyan)] animate-pulse'
+                  : micPermissionState === 'denied'
+                    ? 'text-[var(--red)]'
+                    : micPermissionState === 'prompt'
+                      ? 'text-[var(--gold)] hover:text-[var(--cyan)]'
+                      : 'text-[var(--text-2)] hover:text-[var(--cyan)]'
               }`}
             >
               <Mic size={18} strokeWidth={1.5} />
@@ -371,6 +416,16 @@ export function Composer({
           </button>
         </div>
       </div>
+
+      {/* Unsupported voice notice */}
+      {!voiceSupported && unsupportedVoiceMessage && (
+        <div
+          data-testid="composer-voice-unsupported"
+          className="px-2 pt-1.5 font-mono text-[11px] text-[var(--text-3)] tracking-wide text-center"
+        >
+          {unsupportedVoiceMessage}
+        </div>
+      )}
     </div>
   )
 }

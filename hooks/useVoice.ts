@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getTTSManager, getAudioContext, type TTSOptions } from '@/lib/tts'
+import {
+  startRecognitionWithGesture,
+  useMicStatus,
+  type ManagedRecognitionHandle,
+} from '@/lib/voice'
 
 export interface UseVoiceOptions {
   autoSpeak?: boolean
@@ -20,10 +25,18 @@ export interface UseVoiceOptions {
 export function useVoice(options?: UseVoiceOptions) {
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
-  const [isSupported, setIsSupported] = useState(false)
   const [isAudioBlocked, setIsAudioBlocked] = useState(false)
-  const recognitionRef = useRef<any>(null)
-  const wakeWordRecognitionRef = useRef<any>(null)
+  const [voiceError, setVoiceError] = useState<string | null>(null)
+  const recognitionHandleRef = useRef<ManagedRecognitionHandle | null>(null)
+
+  const {
+    voiceSupported,
+    permissionState,
+    statusLabel,
+    unsupportedMessage,
+    refreshPermission,
+    markPermissionState,
+  } = useMicStatus()
 
   const ttsManager = useRef(getTTSManager()).current
 
@@ -40,122 +53,68 @@ export function useVoice(options?: UseVoiceOptions) {
   }, [])
 
   useEffect(() => {
-    const speechRecSupported =
-      typeof window !== 'undefined' &&
-      ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
-    const speechSynthSupported =
-      typeof window !== 'undefined' && 'speechSynthesis' in window
-
-    setIsSupported(Boolean(speechRecSupported || speechSynthSupported))
-
     ttsManager.setCallbacks(
       level => options?.onLevel?.(level),
       speaking => setIsSpeaking(speaking)
     )
   }, [options, ttsManager])
 
-  // Start active speech recognition for user prompt
+  const clearVoiceError = useCallback(() => {
+    setVoiceError(null)
+  }, [])
+
+  // Start active speech recognition synchronously inside a user click/tap handler
   const startListening = useCallback(
     (onResult: (text: string) => void) => {
       if (typeof window === 'undefined') return
 
-      // Stop speech playback immediately when user speaks or engages mic
+      // Cancel TTS immediately before starting recognition
       ttsManager.cancel()
+      setVoiceError(null)
 
-      const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      if (!SpeechRec) return
-
-      try {
-        if (recognitionRef.current) {
-          recognitionRef.current.abort()
-        }
-
-        const recognition = new SpeechRec()
-        recognition.continuous = false
-        recognition.interimResults = false
-        recognition.lang = 'en-US'
-
-        recognition.onstart = () => setIsListening(true)
-        recognition.onend = () => setIsListening(false)
-        recognition.onerror = () => setIsListening(false)
-
-        recognition.onresult = (event: any) => {
-          const transcript = event.results?.[0]?.[0]?.transcript
-          if (transcript) {
-            onResult(transcript)
-          }
-        }
-
-        recognitionRef.current = recognition
-        recognition.start()
-      } catch {
-        setIsListening(false)
+      if (recognitionHandleRef.current) {
+        recognitionHandleRef.current.abort()
+        recognitionHandleRef.current = null
       }
+
+      const handle = startRecognitionWithGesture({
+        interimResults: false,
+        continuous: false,
+        onPermissionChange: markPermissionState,
+        onStart: () => setIsListening(true),
+        onFinal: transcript => {
+          onResult(transcript)
+        },
+        onError: message => {
+          setIsListening(false)
+          if (message) {
+            setVoiceError(message)
+          }
+        },
+        onEnd: () => {
+          setIsListening(false)
+          recognitionHandleRef.current = null
+        },
+      })
+
+      recognitionHandleRef.current = handle
     },
-    [ttsManager]
+    [markPermissionState, ttsManager]
   )
 
   const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop()
-      setIsListening(false)
+    if (recognitionHandleRef.current) {
+      recognitionHandleRef.current.stop()
+      recognitionHandleRef.current = null
     }
+    setIsListening(false)
   }, [])
 
-  // Passive Wake Word listener ("Hey Jarvis" or "Jarvis")
   useEffect(() => {
-    if (typeof window === 'undefined' || !options?.wakeWordEnabled) {
-      if (wakeWordRecognitionRef.current) {
-        wakeWordRecognitionRef.current.abort()
-        wakeWordRecognitionRef.current = null
-      }
-      return
-    }
-
-    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRec) return
-
-    let active = true
-    const startWakeWord = () => {
-      if (!active) return
-      try {
-        const wakeRec = new SpeechRec()
-        wakeRec.continuous = true
-        wakeRec.interimResults = true
-        wakeRec.lang = 'en-US'
-
-        wakeRec.onresult = (event: any) => {
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript.toLowerCase()
-            if (transcript.includes('hey jarvis') || transcript.includes('jarvis')) {
-              wakeRec.abort()
-              options?.onWakeWord?.()
-              break
-            }
-          }
-        }
-
-        wakeRec.onend = () => {
-          if (active && options?.wakeWordEnabled && !isListening) {
-            setTimeout(startWakeWord, 500)
-          }
-        }
-
-        wakeWordRecognitionRef.current = wakeRec
-        wakeRec.start()
-      } catch {}
-    }
-
-    startWakeWord()
-
     return () => {
-      active = false
-      if (wakeWordRecognitionRef.current) {
-        wakeWordRecognitionRef.current.abort()
-        wakeWordRecognitionRef.current = null
-      }
+      recognitionHandleRef.current?.abort()
     }
-  }, [options?.wakeWordEnabled, options?.onWakeWord, isListening])
+  }, [])
 
   const speak = useCallback(
     async (text: string) => {
@@ -220,7 +179,13 @@ export function useVoice(options?: UseVoiceOptions) {
   return {
     isListening,
     isSpeaking,
-    isSupported,
+    isSupported: voiceSupported,
+    permissionState,
+    statusLabel,
+    unsupportedMessage,
+    voiceError,
+    clearVoiceError,
+    refreshPermission,
     isAudioBlocked,
     unlockAudio,
     startListening,

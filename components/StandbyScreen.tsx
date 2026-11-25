@@ -1,21 +1,23 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { Mic, Terminal, HelpCircle, AlertCircle } from 'lucide-react'
 import { VoiceCommandsModal } from './VoiceCommandsModal'
 import { interpretCommand, type MatchResult } from '@/lib/commands'
 import { getRandomStandbyQuip } from '@/lib/wakeLines'
-import { recordMicRms, clearMicRms } from '@/lib/boot/waveform'
 import { preloadBootTheme } from '@/lib/boot/audio'
 import { getAudioContext } from '@/lib/tts'
 import { setTTSPowerState } from '@/lib/tts/tts-manager'
+import {
+  startRecognitionWithGesture,
+  useMicStatus,
+  type ManagedRecognitionHandle,
+} from '@/lib/voice'
 
 interface StandbyScreenProps {
   onWake: () => void
   onQuip?: (text: string) => void
   speakText?: (text: string) => Promise<void>
-  autoListen?: boolean
   onMicLevel?: (level: number) => void
 }
 
@@ -23,7 +25,6 @@ export function StandbyScreen({
   onWake,
   onQuip,
   speakText,
-  autoListen = false,
   onMicLevel,
 }: StandbyScreenProps) {
   const [isListening, setIsListening] = useState(false)
@@ -32,17 +33,19 @@ export function StandbyScreen({
   const [isCommandsOpen, setIsCommandsOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [standbyHint, setStandbyHint] = useState<string | null>(null)
-  const [speechSupported, setSpeechSupported] = useState(true)
   const [clock, setClock] = useState('00:00:00')
 
-  const recognitionRef = useRef<any>(null)
-  const audioContextRef = useRef<AudioContext | null>(null)
-  const analyserRef = useRef<AnalyserNode | null>(null)
-  const micStreamRef = useRef<MediaStream | null>(null)
-  const animFrameRef = useRef<number | null>(null)
+  const {
+    voiceSupported,
+    permissionState,
+    statusLabel,
+    unsupportedMessage,
+    markPermissionState,
+  } = useMicStatus()
+
+  const recognitionHandleRef = useRef<ManagedRecognitionHandle | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const lastQuipTimeRef = useRef<number>(0)
-  const autoListenRef = useRef(autoListen)
   const isMountedRef = useRef(true)
 
   // Clock
@@ -58,10 +61,6 @@ export function StandbyScreen({
   }, [])
 
   useEffect(() => {
-    autoListenRef.current = autoListen
-  }, [autoListen])
-
-  useEffect(() => {
     isMountedRef.current = true
 
     // Preload the boot theme while in STANDBY (after AudioContext is ready)
@@ -73,22 +72,35 @@ export function StandbyScreen({
 
     return () => {
       isMountedRef.current = false
-      stopAudioAnalysis()
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort()
-        } catch {}
+      if (recognitionHandleRef.current) {
+        recognitionHandleRef.current.abort()
+        recognitionHandleRef.current = null
       }
+      onMicLevel?.(0)
     }
-  }, [])
+  }, [onMicLevel])
 
-  // Check speech recognition support
+  // Subtle ambient mic activity indicator while SpeechRecognition owns the mic
   useEffect(() => {
-    const supported =
-      typeof window !== 'undefined' &&
-      ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
-    setSpeechSupported(Boolean(supported))
-  }, [])
+    if (!isListening) {
+      onMicLevel?.(0)
+      return
+    }
+    let rafId = 0
+    const start = performance.now()
+    const tick = (now: number) => {
+      if (!isMountedRef.current) return
+      const elapsed = (now - start) / 1000
+      const level = 0.2 + 0.15 * Math.sin(elapsed * 5.2)
+      onMicLevel?.(level)
+      rafId = requestAnimationFrame(tick)
+    }
+    rafId = requestAnimationFrame(tick)
+    return () => {
+      cancelAnimationFrame(rafId)
+      onMicLevel?.(0)
+    }
+  }, [isListening, onMicLevel])
 
   // Handle keyboard shortcut: Space or Enter focuses typed input
   useEffect(() => {
@@ -105,66 +117,6 @@ export function StandbyScreen({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isCommandsOpen])
-
-  // Real-time Mic RMS monitoring using Web Audio Analyser
-  const startAudioAnalysis = async () => {
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) return
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      micStreamRef.current = stream
-
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
-      const ctx = new AudioCtx()
-      audioContextRef.current = ctx
-
-      const source = ctx.createMediaStreamSource(stream)
-      const analyser = ctx.createAnalyser()
-      analyser.fftSize = 256
-      source.connect(analyser)
-      analyserRef.current = analyser
-
-      const dataArray = new Uint8Array(analyser.frequencyBinCount)
-
-      const trackLevel = () => {
-        if (!isMountedRef.current || !analyserRef.current) return
-        analyserRef.current.getByteTimeDomainData(dataArray)
-
-        let sumSquares = 0
-        for (let i = 0; i < dataArray.length; i++) {
-          const norm = (dataArray[i] - 128) / 128
-          sumSquares += norm * norm
-        }
-        const rms = Math.min(1.0, Math.sqrt(sumSquares / dataArray.length) * 3.5)
-
-        recordMicRms(rms)
-        onMicLevel?.(rms)
-
-        animFrameRef.current = requestAnimationFrame(trackLevel)
-      }
-
-      animFrameRef.current = requestAnimationFrame(trackLevel)
-    } catch {
-      // Permission denied or audio stream unavailable - fall back to synthetic
-    }
-  }
-
-  const stopAudioAnalysis = () => {
-    if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current)
-      animFrameRef.current = null
-    }
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach(t => t.stop())
-      micStreamRef.current = null
-    }
-    if (audioContextRef.current) {
-      try {
-        audioContextRef.current.close()
-      } catch {}
-      audioContextRef.current = null
-    }
-    onMicLevel?.(0)
-  }
 
   const triggerStandbyQuip = useCallback(async () => {
     const now = Date.now()
@@ -195,24 +147,18 @@ export function StandbyScreen({
           window.speechSynthesis.cancel()
         }
 
-        // 2. Stop speech recognition so echo-cancellation AGC releases the mic
-        if (recognitionRef.current) {
-          try {
-            recognitionRef.current.abort()
-          } catch {}
-          recognitionRef.current = null
+        // 2. Stop speech recognition so the audio subsystem releases the mic
+        if (recognitionHandleRef.current) {
+          recognitionHandleRef.current.abort()
+          recognitionHandleRef.current = null
         }
 
-        // 3. Stop every getUserMedia track — open mic causes browser to duck
-        //    AudioContext playback via echo-cancellation on macOS/WebKit/Blink.
-        stopAudioAnalysis()
-
-        // 4. Timestamp for latency measurement (dev only)
+        // 3. Timestamp for latency measurement (dev only)
         if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
           ;(window as any).__WAKE_ACCEPTED_TIME__ = performance.now()
         }
 
-        // 5. Hand off to parent — BootFilm will start music immediately after
+        // 4. Hand off to parent — BootFilm will start music immediately after
         onWake()
       } else {
         triggerStandbyQuip()
@@ -221,94 +167,56 @@ export function StandbyScreen({
     [onWake, triggerStandbyQuip]
   )
 
-  // Start speech recognition
+  // Start speech recognition synchronously inside the mic click/tap handler
+  // before any await, so user activation is preserved and permission prompts appear.
   const startListening = useCallback(() => {
     if (typeof window === 'undefined') return
-    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRec) {
-      setErrorMessage('Speech recognition is not supported in this browser. Please type command below.')
-      return
-    }
 
     setErrorMessage(null)
+    setStandbyHint(null)
     setTranscript('')
-    startAudioAnalysis()
 
-    try {
-      if (recognitionRef.current) {
-        recognitionRef.current.abort()
-      }
-
-      const rec = new SpeechRec()
-      rec.lang = 'en-IN'
-      rec.interimResults = true
-      rec.continuous = false
-
-      rec.onstart = () => {
-        setIsListening(true)
-      }
-
-      rec.onresult = (event: any) => {
-        let currentText = ''
-        for (let i = 0; i < event.results.length; i++) {
-          currentText += event.results[i][0].transcript
-        }
-        setTranscript(currentText)
-
-        if (event.results[0].isFinal) {
-          processTranscript(currentText)
-        }
-      }
-
-      rec.onerror = (event: any) => {
-        setIsListening(false)
-        stopAudioAnalysis()
-        if (event.error === 'not-allowed') {
-          setErrorMessage('Microphone access denied — please allow mic permissions or type command below.')
-        } else if (event.error === 'no-speech') {
-          setErrorMessage('No speech detected. Try again or type the command.')
-        } else if (event.error === 'network') {
-          setErrorMessage('Network error connecting to speech recognition service.')
-        } else {
-          setErrorMessage(`Speech recognition error: ${event.error}`)
-        }
-      }
-
-      rec.onend = () => {
-        setIsListening(false)
-        stopAudioAnalysis()
-        if (autoListenRef.current && isMountedRef.current) {
-          setTimeout(() => {
-            if (autoListenRef.current && isMountedRef.current) {
-              startListening()
-            }
-          }, 600)
-        }
-      }
-
-      recognitionRef.current = rec
-      rec.start()
-    } catch (err: any) {
-      setIsListening(false)
-      stopAudioAnalysis()
-      setErrorMessage(err?.message || 'Could not start microphone.')
+    if (recognitionHandleRef.current) {
+      recognitionHandleRef.current.abort()
+      recognitionHandleRef.current = null
     }
-  }, [processTranscript])
+
+    const handle = startRecognitionWithGesture({
+      interimResults: true,
+      continuous: false,
+      onPermissionChange: markPermissionState,
+      onStart: () => {
+        setIsListening(true)
+      },
+      onInterim: currentText => {
+        setTranscript(currentText)
+      },
+      onFinal: finalText => {
+        setTranscript(finalText)
+        processTranscript(finalText)
+      },
+      onError: message => {
+        setIsListening(false)
+        if (message) {
+          setErrorMessage(message)
+        }
+      },
+      onEnd: () => {
+        setIsListening(false)
+        recognitionHandleRef.current = null
+      },
+    })
+
+    recognitionHandleRef.current = handle
+  }, [markPermissionState, processTranscript])
 
   const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop()
-      setIsListening(false)
-      stopAudioAnalysis()
+    if (recognitionHandleRef.current) {
+      recognitionHandleRef.current.stop()
+      recognitionHandleRef.current = null
     }
+    setIsListening(false)
   }, [])
-
-  // Auto-listen if preference is active
-  useEffect(() => {
-    if (autoListen && speechSupported) {
-      startListening()
-    }
-  }, [autoListen, speechSupported, startListening])
 
   const handleTypedSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -318,13 +226,20 @@ export function StandbyScreen({
     setTypedInput('')
   }
 
+  const statusColorClass =
+    permissionState === 'granted'
+      ? 'text-[var(--cyan)] border-[var(--cyan-dim)]'
+      : permissionState === 'denied'
+        ? 'text-[var(--red)] border-[var(--red)]'
+        : 'text-[var(--gold)] border-[var(--gold)]'
+
   return (
     <div
       className="fixed inset-0 w-full h-[100dvh] z-20 pointer-events-auto select-none overflow-hidden flex flex-col justify-between"
       role="region"
       aria-label="JARVIS Standby Mode"
     >
-      {/* 1. TOP HEADER: Status top-left (nowrap), Voice commands top-right, safe-area padding */}
+      {/* 1. TOP HEADER */}
       <header className="w-full flex items-center justify-between px-6 pt-[calc(14px+env(safe-area-inset-top,0px))] z-30">
         <div className="flex items-center gap-2 font-hud text-xs tracking-[0.2em] whitespace-nowrap text-[var(--gold)]">
           <span className="w-2 h-2 rounded-full bg-[var(--gold)] animate-pulse shrink-0" />
@@ -342,21 +257,19 @@ export function StandbyScreen({
         </button>
       </header>
 
-      {/* 2. LOWER THIRD ACTIVATION PANEL: Center-aligned, completely below the orb core, with soft radial scrim */}
+      {/* 2. LOWER THIRD ACTIVATION PANEL */}
       <main className="w-full max-w-xl mx-auto px-4 pb-[calc(7vh+env(safe-area-inset-bottom,0px))] flex flex-col items-center text-center space-y-4 z-30">
-        {/* Soft radial scrim behind text block only */}
         <div
           className="w-full rounded-2xl p-6 sm:p-8 flex flex-col items-center space-y-3"
           style={{
-            background: 'radial-gradient(ellipse at center, rgba(2, 4, 10, 0.88) 0%, rgba(2, 4, 10, 0.5) 65%, transparent 100%)',
+            background:
+              'radial-gradient(ellipse at center, rgba(2, 4, 10, 0.88) 0%, rgba(2, 4, 10, 0.5) 65%, transparent 100%)',
           }}
         >
-          {/* Eyebrow in Mono, 62% opacity */}
           <div className="font-mono text-xs text-[var(--text-3)] tracking-[0.25em] uppercase opacity-60">
             AWAITING ACTIVATION
           </div>
 
-          {/* Large Rajdhani Wake Command Line: clamp(28px, 4.2vw, 64px) */}
           <div className="w-full">
             <h1 className="font-hud text-[clamp(28px,4.2vw,56px)] font-bold tracking-[0.12em] text-[var(--cyan)] drop-shadow-[0_0_16px_rgba(92,203,245,0.45)] leading-tight">
               <span className="hidden md:inline whitespace-nowrap">SAY: "WAKE UP, JARVIS"</span>
@@ -367,31 +280,62 @@ export function StandbyScreen({
             </h1>
           </div>
 
-          {/* Hint Line in Mono 14px with AA contrast */}
           <p className="font-mono text-sm text-[var(--text-2)] tracking-wider">
-            or press Space / tap the mic / type it
+            {voiceSupported
+              ? 'or press Space / tap the mic / type it'
+              : 'press Space or type a command below'}
           </p>
 
-          {/* Pulsing Mic Button (>= 56px touch target) */}
-          <div className="relative flex items-center justify-center pt-2">
-            <button
-              onClick={isListening ? stopListening : startListening}
-              aria-label={isListening ? 'Stop listening' : 'Start listening for activation'}
-              className={`w-16 h-16 rounded-full flex items-center justify-center border transition-all cursor-pointer relative z-10 ${
-                isListening
-                  ? 'border-[var(--cyan)] bg-[var(--cyan-faint)] text-[var(--cyan)] shadow-[0_0_24px_var(--cyan)] animate-pulse scale-105'
-                  : 'border-[var(--line)] bg-[var(--surface-hi)] text-[var(--text-2)] hover:text-[var(--cyan)] hover:border-[var(--cyan)] hover:scale-105 active:scale-95'
-              }`}
+          {/* Mic button (hidden when unsupported) + Honest Status */}
+          {voiceSupported ? (
+            <div className="flex flex-col items-center gap-2 pt-2">
+              <div className="relative flex items-center justify-center">
+                <button
+                  type="button"
+                  data-testid="standby-mic-button"
+                  onClick={isListening ? stopListening : startListening}
+                  aria-label={isListening ? 'Stop listening' : `Start listening (${statusLabel})`}
+                  className={`w-16 h-16 rounded-full flex items-center justify-center border transition-all cursor-pointer relative z-10 ${
+                    isListening
+                      ? 'border-[var(--cyan)] bg-[var(--cyan-faint)] text-[var(--cyan)] shadow-[0_0_24px_var(--cyan)] animate-pulse scale-105'
+                      : permissionState === 'denied'
+                        ? 'border-[var(--red)] bg-[var(--surface-hi)] text-[var(--red)] hover:scale-105 active:scale-95'
+                        : 'border-[var(--line)] bg-[var(--surface-hi)] text-[var(--text-2)] hover:text-[var(--cyan)] hover:border-[var(--cyan)] hover:scale-105 active:scale-95'
+                  }`}
+                >
+                  <Mic size={24} strokeWidth={1.5} />
+                </button>
+
+                {isListening && (
+                  <div className="absolute inset-0 rounded-full border border-[var(--cyan)] animate-ping pointer-events-none opacity-40" />
+                )}
+              </div>
+
+              <span
+                data-testid="standby-mic-status"
+                className={`font-mono text-[10px] tracking-[0.2em] uppercase px-2 py-0.5 border bg-[var(--surface-hi)] ${statusColorClass}`}
+              >
+                {isListening ? 'LISTENING' : `MIC: ${statusLabel}`}
+              </span>
+            </div>
+          ) : (
+            <div
+              data-testid="standby-voice-unsupported"
+              className="flex flex-col items-center gap-1.5 pt-1"
             >
-              <Mic size={24} strokeWidth={1.5} />
-            </button>
+              <span
+                data-testid="standby-mic-status"
+                className="font-mono text-[10px] tracking-[0.2em] uppercase px-2 py-0.5 border border-[var(--gold)] text-[var(--gold)] bg-[var(--surface-hi)]"
+              >
+                MIC: UNSUPPORTED
+              </span>
+              <p className="font-mono text-xs text-[var(--text-2)]">
+                {unsupportedMessage}
+              </p>
+            </div>
+          )}
 
-            {isListening && (
-              <div className="absolute inset-0 rounded-full border border-[var(--cyan)] animate-ping pointer-events-none opacity-40" />
-            )}
-          </div>
-
-          {/* Live speech feedback if hearing */}
+          {/* Live speech feedback */}
           {transcript && (
             <div className="font-mono text-xs text-[var(--cyan)] bg-[var(--surface-hi)] px-3 py-1 border border-[var(--cyan-dim)] max-w-full truncate">
               HEARD: "{transcript}"
@@ -407,13 +351,17 @@ export function StandbyScreen({
 
           {/* Error Banner */}
           {errorMessage && (
-            <div className="flex items-center gap-1.5 font-mono text-xs text-[var(--red)] bg-[var(--surface-hi)] px-3 py-1.5 border border-[var(--red)] max-w-md">
+            <div
+              role="alert"
+              data-testid="standby-voice-error"
+              className="flex items-center gap-2 font-mono text-xs text-[var(--red)] bg-[var(--surface-hi)] px-3 py-2 border border-[var(--red)] max-w-md text-left"
+            >
               <AlertCircle size={14} className="shrink-0" />
               <span>{errorMessage}</span>
             </div>
           )}
 
-          {/* Centered Typed Command Input (max-width 520px, SEND inside plate) */}
+          {/* Centered Typed Command Input (always visible) */}
           <form onSubmit={handleTypedSubmit} className="w-full max-w-[520px] pt-2">
             <div className="flex items-center border border-[var(--line)] bg-[var(--surface-hi)] focus-within:border-[var(--cyan)] shadow-[0_0_12px_rgba(2,4,10,0.6)] px-3 py-1.5 transition-colors">
               <Terminal size={14} className="text-[var(--cyan)] mr-2 shrink-0" />
@@ -436,7 +384,7 @@ export function StandbyScreen({
         </div>
       </main>
 
-      {/* 3. BOTTOM TELEMETRY ROW: ONE row in two groups, nowrap with ellipsis, padded for safe area */}
+      {/* 3. BOTTOM TELEMETRY ROW */}
       <footer className="w-full px-6 pb-[calc(12px+env(safe-area-inset-bottom,0px))] flex items-center justify-between font-mono text-[11px] text-[var(--text-3)] whitespace-nowrap overflow-hidden z-30">
         <div className="flex items-center gap-2 truncate">
           <span>REACTOR: DORMANT (0.02 Hz)</span>
